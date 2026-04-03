@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CS:APP Data Lab - 位操作函数完整演示</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 0;
+        }
+
+        /* 导航栏样式 */
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .navbar-content {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .navbar h1 {
+            color: #667eea;
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .nav-link {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+        }
+
+        .nav-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .nav-link:active {
+            transform: translateY(0);
+        }
+
+        /* 主内容区域 */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            scroll-margin-top: 100px;
+        }
+
+        h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .function-code {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+
+        .keyword { color: #66d9ef; }
+        .type { color: #a6e22e; }
+        .number { color: #ae81ff; }
+        .operator { color: #f92672; }
+        .function { color: #e6db74; }
+        .comment { color: #75715e; }
+
+        /* 二进制显示 */
+        .bit-display {
+            display: flex;
+            gap: 2px;
+            margin: 20px 0;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .bit-group {
+            display: flex;
+            gap: 2px;
+        }
+
+        .bit-group:not(:last-child)::after {
+            content: '';
+            width: 8px;
+        }
+
+        .bit {
+            width: 28px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 18px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .bit.zero {
+            background: #e0e0e0;
+            color: #666;
+        }
+
+        .bit.one {
+            background: #667eea;
+            color: white;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.5);
+        }
+
+        .bit.highlight {
+            transform: scale(1.2);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+            z-index: 10;
+        }
+
+        .bit-label {
+            text-align: center;
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        /* 控制区域 */
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        input[type="number"], input[type="text"] {
+            padding: 12px 20px;
+            font-size: 16px;
+            border: 2px solid #667eea;
+            border-radius: 25px;
+            outline: none;
+            transition: all 0.3s ease;
+            width: 200px;
+        }
+
+        input:focus {
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
+        }
+
+        /* 结果显示 */
+        .result-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .result-label {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .result-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+
+        .success {
+            color: #28a745;
+        }
+
+        .failure {
+            color: #dc3545;
+        }
+
+        /* 步骤说明 */
+        .step-explanation {
+            margin: 15px 0;
+            padding: 15px;
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            border-radius: 5px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .step-number {
+            display: inline-block;
+            background: #ffc107;
+            color: #333;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 25px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .value-display {
+            font-family: 'Courier New', monospace;
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 5px 10px;
+            border-radius: 3px;
+            display: inline-block;
+            margin: 5px 0;
+        }
+
+        /* 说明区域 */
+        .explanation {
+            margin-top: 15px;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 8px;
+            border-left: 4px solid #2196F3;
+        }
+
+        .explanation-title {
+            font-weight: bold;
+            color: #1976D2;
+            margin-bottom: 8px;
+        }
+
+        .explanation-text {
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .formula {
+            background: #fff3e0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            display: inline-block;
+        }
+
+        /* 图例 */
+        .legend {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+        }
+
+        /* 双列布局 */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .two-col {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-links {
+                gap: 5px;
+            }
+
+            .nav-link {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+        }
+
+        /* 返回顶部按钮 */
+        .back-to-top {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .back-to-top:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .back-to-top.show {
+            display: flex;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="navbar-content">
+            <h1>🎮 CS:APP Data Lab - 位操作函数演示</h1>
+            <div class="nav-links">
+                <a class="nav-link" onclick="scrollToSection('tmax-section')">tmax</a>
+                <a class="nav-link" onclick="scrollToSection('isPositive-section')">isPositive</a>
+                <a class="nav-link" onclick="scrollToSection('greatestBitPos-section')">greatestBitPos</a>
+                <a class="nav-link" onclick="scrollToSection('leastBitPos-section')">leastBitPos</a>
+                <a class="nav-link" onclick="scrollToSection('isNegative-section')">isNegative</a>
+                <a class="nav-link" onclick="scrollToSection('isGreater-section')">isGreater</a>
+                <a class="nav-link" onclick="scrollToSection('tmin-section')">tmin</a>
+                <a class="nav-link" onclick="scrollToSection('plusOne-section')">plusOne</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- tmax 函数演示 -->
+        <div class="section" id="tmax-section">
+            <h2>📌 tmax() - 返回最大补码整数</h2>
+
+            <div class="function-code">
+<span class="type">int</span> <span class="function">tmax</span>(<span class="type">void</span>) {
+    <span class="keyword">return</span> <span class="operator">~</span>(<span class="number">1</span> <span class="operator">&lt;&lt;</span> <span class="number">31</span>);
+}
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #e0e0e0;"></div>
+                    <span>0 位</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #667eea;"></div>
+                    <span>1 位</span>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button onclick="animateTmax()">▶️ 开始演示</button>
+                <button onclick="resetTmax()">🔄 重置</button>
+            </div>
+
+            <div id="tmax-steps"></div>
+
+            <div class="result-box">
+                <div class="result-label">结果</div>
+                <div id="tmax-result">点击"开始演示"查看动画</div>
+            </div>
+        </div>
+
+        <!-- isPositive 函数演示 -->
+        <div class="section" id="isPositive-section">
+            <h2>📌 isPositive() - 判断是否为正数</h2>
+
+            <div class="function-code">
+<span class="type">int</span> <span class="function">isPositive</span>(<span class="type">int</span> x) {
+    <span class="keyword">return</span> (<span class="operator">!</span>(x <span class="operator">&gt;&gt;</span> <span class="number">31</span>)) <span class="operator">&amp;</span> (<span class="operator">!!</span>x);
+}
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #e0e0e0;"></div>
+                    <span>0 位</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #667eea;"></div>
+                    <span>1 位</span>
+                </div>
+            </div>
+
+            <div class="controls">
+                <input type="number" id="isPositive-input" placeholder="输入测试数字" value="5">
+                <button onclick="animateIsPositive()">▶️ 开始演示</button>
+                <button onclick="resetIsPositive()">🔄 重置</button>
+            </div>
+
+            <div id="isPositive-steps"></div>
+
+            <div class="result-box">
+                <div class="result-label">结果</div>
+                <div id="isPositive-result">输入数字并点击"开始演示"</div>
+            </div>
+
+            <!-- 快速测试区 -->
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 2px dashed #ddd;">
+                <h3 style="color: #667eea; margin-bottom: 15px;">🧪 快速测试</h3>
+                <div class="controls">
+                    <button onclick="quickTest(-1)">测试 -1</button>
+                    <button onclick="quickTest(0)">测试 0</button>
+                    <button onclick="quickTest(1)">测试 1</button>
+                    <button onclick="quickTest(100)">测试 100</button>
+                    <button onclick="quickTest(-100)">测试 -100</button>
+                    <button onclick="quickTest(2147483647)">测试 TMax</button>
+                    <button onclick="quickTest(-2147483648)">测试 TMin</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- greatestBitPos -->
+        <div class="section" id="greatestBitPos-section">
+            <h2>📍 greatestBitPos() - 返回最高有效1位的掩码</h2>
+
+            <div class="function-code">
+<span class="type">int</span> <span class="function">greatestBitPos</span>(<span class="type">int</span> x) {
+  <span class="comment">/* 将所有1位向右传播,然后取异或得到最高位 */</span>
+  <span class="type">int</span> temp = x;
+  temp = temp | (temp &gt;&gt; 1);
+  temp = temp | (temp &gt;&gt; 2);
+  temp = temp | (temp &gt;&gt; 4);
+  temp = temp | (temp &gt;&gt; 8);
+  temp = temp | (temp &gt;&gt; 16);
+  <span class="keyword">return</span> temp ^ ((temp &gt;&gt; 1) &amp; ~(1 &lt;&lt; 31));
+}
+            </div>
+
+            <div class="controls">
+                <label>x (十进制):</label>
+                <input type="number" id="greatestBitPos-x" value="96">
+                <button onclick="calculateGreatestBitPos()">计算</button>
+            </div>
+
+            <div class="result-box">
+                <div class="result-label">结果 (十进制):</div>
+                <div class="result-value" id="greatestBitPos-result-dec">-</div>
+                <div class="result-label" style="margin-top: 10px;">结果 (十六进制):</div>
+                <div class="result-value" id="greatestBitPos-result-hex">-</div>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #e0e0e0;"></div>
+                    <span>0 位</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #667eea;"></div>
+                    <span>1 位</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffc107;"></div>
+                    <span>高亮位</span>
+                </div>
+            </div>
+
+            <div id="greatestBitPos-input-bits"></div>
+            <div id="greatestBitPos-output-bits"></div>
+
+            <div class="explanation">
+                <div class="explanation-title">💡 原理说明:</div>
+                <div class="explanation-text">
+                    使用右传播技术：将最高位1向右传播，使所有低位都变成1。<br>
+                    公式: <span class="formula">temp ^ ((temp >> 1) & ~(1 << 31))</span><br>
+                    其中 temp 是通过多次 x | (x >> n) 传播得到的全1模式。
+                </div>
+            </div>
+        </div>
+
+        <!-- leastBitPos -->
+        <div class="section" id="leastBitPos-section">
+            <h2>🎯 leastBitPos() - 返回最低有效1位的掩码</h2>
+
+            <div class="function-code">
+<span class="type">int</span> <span class="function">leastBitPos</span>(<span class="type">int</span> x) {
+  <span class="comment">/* 利用 x & (-x) 可以得到最低位的1 */</span>
+  <span class="keyword">return</span> x &amp; (~x + 1);
+}
+            </div>
+
+            <div class="controls">
+                <label>x (十进制):</label>
+                <input type="number" id="leastBitPos-x" value="96">
+                <button onclick="calculateLeastBitPos()">计算</button>
+            </div>
+
+            <div class="result-box">
+                <div class="result-label">结果 (十进制):</div>
+                <div class="result-value" id="leastBitPos-result-dec">-</div>
+                <div class="result-label" style="margin-top: 10px;">结果 (十六进制):</div>
+                <div class="result-value" id="leastBitPos-result-hex">-</div>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #e0e0e0;"></div>
+                    <span>0 位</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #667eea;"></div>
+                    <span>1 位</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffc107;"></div>
+                    <span>高亮位</span>
+                </div>
+            </div>
+
+            <div id="leastBitPos-input-bits"></div>
+            <div id="leastBitPos-output-bits"></div>
+
+            <div class="explanation">
+                <div class="explanation-title">💡 原理说明:</div>
+                <div class="explanation-text">
+                    利用 x & (-x) 的经典位操作技巧。<br>
+                    公式: <span class="formula">x & (~x + 1)</span><br>
+                    因为 -x = ~x + 1（补码表示），x 与 -x 按位与后只有最低位的1保留下来。
+                </div>
+            </div>
+        </div>
+
+        <!-- isNegative -->
+        <div class="section" id="isNegative-section">
+            <h2>➖ isNegative() - 判断是否为负数</h2>
+
+            <div class="function-code">
+<span class="type">int</span> <span class="function">isNegative</span>(<span class="type">int</span> x) {
+  <span class="comment">/* 负数的符号位(第31位)为1 */</span>
+  <span class="keyword">return</span> (x &gt;&gt; 31) &amp; 1;
+}
+            </div>
+
+            <div class="controls">
+                <label>x (十进制):</label>
+                <input type="number" id="isNegative-x" value="-5">
+                <button onclick="calculateIsNegative()">判断</button>
+            </div>
+
+            <div class="result-box">
+                <div class="result-label">结果:</div>
+                <div class="result-value" id="isNegative-result">-</div>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #e0e0e0;"></div>
+                    <span>0 位</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #667eea;"></div>
+                    <span>1 位</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffc107;"></div>
+                    <span>符号位</span>
+                </div>
+            </div>
+
+            <div id="isNegative-bits"></div>
+
+            <div class="explanation">
+                <div class="explanation-title">💡 原理说明:</div>
+                <div class="explanation-text">
+                    负数的符号位（第31位）为1，正数和0的符号位为0。<br>
+                    公式: <span class="formula">(x >> 31) & 1</span><br>
+                    算术右移31位后，最低位即为原数的符号位。
+                </div>
+            </div>
+        </div>
+
+        <!-- isGreater -->
+        <div class="section" id="isGreater-section">
+            <h2>⚖️ isGreater() - 判断 x > y</h2>
+
+            <div class="function-code">
+<span class="type">int</span> <span class="function">isGreater</span>(<span class="type">int</span> x, <span class="type">int</span> y) {
+  <span class="type">int</span> sign_x = (x &gt;&gt; 31) &amp; 1;
+  <span class="type">int</span> sign_y = (y &gt;&gt; 31) &amp; 1;
+  <span class="type">int</span> diff = y + (~x + 1);  <span class="comment">/* y - x */</span>
+  <span class="type">int</span> sign_diff = (diff &gt;&gt; 31) &amp; 1;
+  <span class="type">int</span> same_sign = !(sign_x ^ sign_y);
+  <span class="type">int</span> not_equal = !!diff;
+  <span class="keyword">return</span> ((same_sign &amp; sign_diff &amp; not_equal) | (!same_sign &amp; !sign_x)) &amp; 1;
+}
+            </div>
+
+            <div class="controls">
+                <div class="two-col">
+                    <div>
+                        <label>x:</label>
+                        <input type="number" id="isGreater-x" value="5">
+                    </div>
+                    <div>
+                        <label>y:</label>
+                        <input type="number" id="isGreater-y" value="4">
+                    </div>
+                </div>
+                <button onclick="calculateIsGreater()" style="margin-top: 10px;">比较</button>
+            </div>
+
+            <div class="result-box">
+                <div class="result-label">结果:</div>
+                <div class="result-value" id="isGreater-result">-</div>
+            </div>
+
+            <div id="isGreater-analysis" style="background: #2d2d2d; color: #4CAF50; padding: 15px; border-radius: 8px; font-family: monospace; white-space: pre-line; margin-top: 15px;"></div>
+
+            <div class="explanation">
+                <div class="explanation-title">💡 原理说明:</div>
+                <div class="explanation-text">
+                    需要考虑溢出情况。分三种情况：<br>
+                    1. x正y负：直接返回1<br>
+                    2. x负y正：直接返回0<br>
+                    3. 同号：计算 y - x，如果结果为负且不相等，则 x > y<br>
+                    公式涉及符号位比较和差值的符号判断。
+                </div>
+            </div>
+        </div>
+
+        <!-- tmin -->
+        <div class="section" id="tmin-section">
+            <h2>⬇️ tmin() - 返回最小补码整数</h2>
+
+            <div class="function-code">
+<span class="type">int</span> <span class="function">tmin</span>(<span class="type">void</span>) {
+  <span class="comment">/* 最小补码整数是 0x80000000 */</span>
+  <span class="keyword">return</span> 1 &lt;&lt; 31;
+}
+            </div>
+
+            <div class="controls">
+                <button onclick="calculateTmin()">获取 Tmin</button>
+            </div>
+
+            <div class="result-box">
+                <div class="result-label">Tmin (十进制):</div>
+                <div class="result-value" id="tmin-result-dec">-</div>
+                <div class="result-label" style="margin-top: 10px;">Tmin (十六进制):</div>
+                <div class="result-value" id="tmin-result-hex">-</div>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #e0e0e0;"></div>
+                    <span>0 位</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #667eea;"></div>
+                    <span>1 位</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffc107;"></div>
+                    <span>符号位</span>
+                </div>
+            </div>
+
+            <div id="tmin-bits"></div>
+
+            <div class="explanation">
+                <div class="explanation-title">💡 原理说明:</div>
+                <div class="explanation-text">
+                    最小补码整数是 0x80000000，即 1 << 31。<br>
+                    公式: <span class="formula">1 << 31</span><br>
+                    在32位补码表示中，这是唯一一个等于自己负数的数。
+                </div>
+            </div>
+        </div>
+
+        <!-- plusOne -->
+        <div class="section" id="plusOne-section">
+            <h2>➕ plusOne() - 返回 x + 1</h2>
+
+            <div class="function-code">
+<span class="type">int</span> <span class="function">plusOne</span>(<span class="type">int</span> x) {
+  <span class="comment">/* 简单的加1操作 */</span>
+  <span class="keyword">return</span> x + 1;
+}
+            </div>
+
+            <div class="controls">
+                <label>x (十进制):</label>
+                <input type="number" id="plusOne-x" value="5">
+                <button onclick="calculatePlusOne()">计算</button>
+            </div>
+
+            <div class="result-box">
+                <div class="result-label">x + 1 (十进制):</div>
+                <div class="result-value" id="plusOne-result-dec">-</div>
+                <div class="result-label" style="margin-top: 10px;">x + 1 (十六进制):</div>
+                <div class="result-value" id="plusOne-result-hex">-</div>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #e0e0e0;"></div>
+                    <span>0 位</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #667eea;"></div>
+                    <span>1 位</span>
+                </div>
+            </div>
+
+            <div class="two-col">
+                <div>
+                    <h3 style="color: #667eea; margin-bottom: 10px;">输入 x:</h3>
+                    <div id="plusOne-input-bits"></div>
+                </div>
+                <div>
+                    <h3 style="color: #667eea; margin-bottom: 10px;">输出 x + 1:</h3>
+                    <div id="plusOne-output-bits"></div>
+                </div>
+            </div>
+
+            <div class="explanation">
+                <div class="explanation-title">💡 原理说明:</div>
+                <div class="explanation-text">
+                    最简单的位操作函数之一，直接返回 x + 1。<br>
+                    公式: <span class="formula">x + 1</span><br>
+                    虽然看起来简单，但需要理解加法在补码表示中的实现。
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 返回顶部按钮 -->
+    <button class="back-to-top" id="backToTop" onclick="scrollToTop()">↑</button>
+
+    <script>
+        // ============ 工具函数 ============
+        function intToBinaryArray(num) {
+            const bits = [];
+            for (let i = 31; i >= 0; i--) {
+                bits.push((num >>> i) & 1);
+            }
+            return bits;
+        }
+
+        function createBitDisplay(bits, highlightBits = []) {
+            let html = '<div class="bit-display">';
+            for (let i = 0; i < 32; i++) {
+                if (i % 8 === 0 && i !== 0) {
+                    html += '</div><div class="bit-group">';
+                }
+                if (i === 0) {
+                    html += '<div class="bit-group">';
+                }
+                const isHighlight = highlightBits.includes(31 - i);
+                const bitClass = bits[i] === 1 ? 'one' : 'zero';
+                const highlightClass = isHighlight ? 'highlight' : '';
+                html += `<div class="bit ${bitClass} ${highlightClass}">${bits[i]}</div>`;
+            }
+            html += '</div></div>';
+            return html;
+        }
+
+        function createBitDisplayWithLabels(bits, highlightBits = []) {
+            let html = '<div class="bit-display">';
+            for (let i = 0; i < 32; i++) {
+                if (i % 8 === 0 && i !== 0) {
+                    html += '</div><div class="bit-group">';
+                }
+                if (i === 0) {
+                    html += '<div class="bit-group">';
+                }
+                const isHighlight = highlightBits.includes(31 - i);
+                const bitClass = bits[i] === 1 ? 'one' : 'zero';
+                const highlightClass = isHighlight ? 'highlight' : '';
+                html += `<div class="bit ${bitClass} ${highlightClass}">${bits[i]}</div>`;
+            }
+            html += '</div>';
+            html += '<div class="bit-display" style="gap: 2px;">';
+            for (let i = 0; i < 32; i++) {
+                if (i % 8 === 0 && i !== 0) {
+                    html += '<div style="width: 8px;"></div>';
+                }
+                html += `<div class="bit-label">${31-i}</div>`;
+            }
+            html += '</div>';
+            return html;
+        }
+
+        function formatHex(num) {
+            return '0x' + (num >>> 0).toString(16).toUpperCase().padStart(8, '0');
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function createStep(num, title, description) {
+            return `
+                <div class="step-explanation">
+                    <span class="step-number">${num}</span>
+                    <strong>${title}</strong>
+                    <div style="margin-top: 10px; color: #666;">${description}</div>
+                </div>
+            `;
+        }
+
+        // ============ 导航功能 ============
+        function scrollToSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            if (section) {
+                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // 显示/隐藏返回顶部按钮
+        window.addEventListener('scroll', function() {
+            const backToTop = document.getElementById('backToTop');
+            if (window.pageYOffset > 300) {
+                backToTop.classList.add('show');
+            } else {
+                backToTop.classList.remove('show');
+            }
+        });
+
+        // ============ tmax 函数 ============
+        let tmaxAnimationRunning = false;
+
+        async function animateTmax() {
+            if (tmaxAnimationRunning) return;
+            tmaxAnimationRunning = true;
+
+            const stepsDiv = document.getElementById('tmax-steps');
+            const resultDiv = document.getElementById('tmax-result');
+            stepsDiv.innerHTML = '';
+            resultDiv.innerHTML = '演示中...';
+
+            let step = createStep(1, '初始值: 数字 1', '1 (二进制)');
+            step += createBitDisplayWithLabels(intToBinaryArray(1), [0]);
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
+
+            step += createStep(2, '执行 1 &lt;&lt; 31', '将 1 左移 31 位，得到最小负数 TMin');
+            const shifted = 1 << 31;
+            step += `<div class="value-display">${formatHex(shifted)}</div>`;
+            step += createBitDisplayWithLabels(intToBinaryArray(shifted), [31]);
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
+
+            step += createStep(3, '执行 ~(1 &lt;&lt; 31)', '对结果取反，得到最大正数 TMax');
+            const tmax = ~shifted;
+            step += `<div class="value-display">${formatHex(tmax)}</div>`;
+            step += createBitDisplayWithLabels(intToBinaryArray(tmax), []);
+            stepsDiv.innerHTML = step;
+            await sleep(500);
+
+            resultDiv.innerHTML = `
+                <div class="result-value success">TMax = ${tmax}</div>
+                <div class="value-display">${formatHex(tmax)}</div>
+                <p style="margin-top: 10px; color: #666;">这是 32 位补码表示的最大正整数</p>
+            `;
+
+            tmaxAnimationRunning = false;
+        }
+
+        function resetTmax() {
+            document.getElementById('tmax-steps').innerHTML = '';
+            document.getElementById('tmax-result').innerHTML = '点击"开始演示"查看动画';
+        }
+
+        // ============ isPositive 函数 ============
+        let isPositiveAnimationRunning = false;
+
+        async function animateIsPositive() {
+            if (isPositiveAnimationRunning) return;
+            isPositiveAnimationRunning = true;
+
+            const input = document.getElementById('isPositive-input');
+            let x = parseInt(input.value) || 0;
+            x = x | 0;
+
+            const stepsDiv = document.getElementById('isPositive-steps');
+            const resultDiv = document.getElementById('isPositive-result');
+            stepsDiv.innerHTML = '';
+            resultDiv.innerHTML = '演示中...';
+
+            await sleep(300);
+
+            let step = createStep(1, `输入值 x = ${x}`, formatHex(x));
+            step += createBitDisplayWithLabels(intToBinaryArray(x), []);
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
+
+            const signBit = x >> 31;
+            step += createStep(2, '执行 x &gt;&gt; 31', '算术右移31位，得到符号扩展结果');
+            step += `<div>符号位为 ${x < 0 ? '1（负数）' : '0（非负数）'}</div>`;
+            step += `<div class="value-display">${formatHex(signBit)}</div>`;
+            step += createBitDisplayWithLabels(intToBinaryArray(signBit), [31]);
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
+
+            const notSign = !signBit ? 1 : 0;
+            step += createStep(3, '执行 !(x &gt;&gt; 31)', '对符号扩展结果取反');
+            step += `<div>结果 = ${notSign}</div>`;
+            step += `<div class="value-display">${notSign}</div>`;
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
+
+            const notZero = !!x ? 1 : 0;
+            step += createStep(4, '执行 !!x', '双重否定，判断x是否非零');
+            step += `<div>x ${x === 0 ? '等于' : '不等于'} 0</div>`;
+            step += `<div class="value-display">${notZero}</div>`;
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
+
+            const result = notSign & notZero;
+            step += createStep(5, '执行 (!(x &gt;&gt; 31)) & (!!x)', '将两部分进行按位与');
+            step += `<div>${notSign} & ${notZero} = ${result}</div>`;
+            stepsDiv.innerHTML = step;
+            await sleep(500);
+
+            const isPositive = result === 1;
+            resultDiv.innerHTML = `
+                <div class="result-value ${isPositive ? 'success' : 'failure'}">
+                    isPositive(${x}) = ${result}
+                </div>
+                <p style="margin-top: 10px; color: #666;">
+                    ${x} ${isPositive ? '是正数 ✓' : (x === 0 ? '是零，不是正数' : '是负数 ✗')}
+                </p>
+            `;
+
+            isPositiveAnimationRunning = false;
+        }
+
+        function resetIsPositive() {
+            document.getElementById('isPositive-steps').innerHTML = '';
+            document.getElementById('isPositive-result').innerHTML = '输入数字并点击"开始演示"';
+        }
+
+        function quickTest(value) {
+            document.getElementById('isPositive-input').value = value;
+            animateIsPositive();
+        }
+
+        // ============ greatestBitPos 函数 ============
+        function greatestBitPos(x) {
+            let temp = x;
+            temp = temp | (temp >> 1);
+            temp = temp | (temp >> 2);
+            temp = temp | (temp >> 4);
+            temp = temp | (temp >> 8);
+            temp = temp | (temp >> 16);
+            return temp ^ ((temp >>> 1) & ~(1 << 31));
+        }
+
+        function calculateGreatestBitPos() {
+            const x = parseInt(document.getElementById('greatestBitPos-x').value) || 0;
+            const result = greatestBitPos(x);
+
+            document.getElementById('greatestBitPos-result-dec').textContent = result;
+            document.getElementById('greatestBitPos-result-hex').textContent = formatHex(result);
+
+            const xBits = (x >>> 0).toString(2).padStart(32, '0');
+            const msbPos = xBits.indexOf('1');
+            const highlightBits = msbPos >= 0 ? [31 - msbPos] : [];
+
+            document.getElementById('greatestBitPos-input-bits').innerHTML = '<h3 style="color: #667eea; margin-bottom: 10px;">输入 x:</h3>' + createBitDisplayWithLabels(intToBinaryArray(x), []);
+            document.getElementById('greatestBitPos-output-bits').innerHTML = '<h3 style="color: #667eea; margin-bottom: 10px;">结果掩码:</h3>' + createBitDisplayWithLabels(intToBinaryArray(result), highlightBits);
+        }
+
+        // ============ leastBitPos 函数 ============
+        function leastBitPos(x) {
+            return x & (~x + 1);
+        }
+
+        function calculateLeastBitPos() {
+            const x = parseInt(document.getElementById('leastBitPos-x').value) || 0;
+            const result = leastBitPos(x);
+
+            document.getElementById('leastBitPos-result-dec').textContent = result;
+            document.getElementById('leastBitPos-result-hex').textContent = formatHex(result);
+
+            const xBits = (x >>> 0).toString(2).padStart(32, '0');
+            const lsbPos = xBits.lastIndexOf('1');
+            const highlightBits = lsbPos >= 0 ? [31 - lsbPos] : [];
+
+            document.getElementById('leastBitPos-input-bits').innerHTML = '<h3 style="color: #667eea; margin-bottom: 10px;">输入 x:</h3>' + createBitDisplayWithLabels(intToBinaryArray(x), []);
+            document.getElementById('leastBitPos-output-bits').innerHTML = '<h3 style="color: #667eea; margin-bottom: 10px;">结果掩码:</h3>' + createBitDisplayWithLabels(intToBinaryArray(result), highlightBits);
+        }
+
+        // ============ isNegative 函数 ============
+        function isNegative(x) {
+            return (x >> 31) & 1;
+        }
+
+        function calculateIsNegative() {
+            const x = parseInt(document.getElementById('isNegative-x').value) || 0;
+            const result = isNegative(x);
+
+            const resultDiv = document.getElementById('isNegative-result');
+            resultDiv.textContent = result === 1 ? '是负数 ✓' : '不是负数 ✗';
+            resultDiv.style.color = result === 1 ? '#f44336' : '#4CAF50';
+
+            document.getElementById('isNegative-bits').innerHTML = createBitDisplayWithLabels(intToBinaryArray(x), [31]);
+        }
+
+        // ============ isGreater 函数 ============
+        function isGreater(x, y) {
+            const sign_x = (x >> 31) & 1;
+            const sign_y = (y >> 31) & 1;
+            const diff = y + (~x + 1);
+            const sign_diff = (diff >> 31) & 1;
+            const same_sign = !(sign_x ^ sign_y) ? 1 : 0;
+            const not_equal = (diff !== 0) ? 1 : 0;
+            return ((same_sign & sign_diff & not_equal) | ((1 - same_sign) & (1 - sign_x))) & 1;
+        }
+
+        function calculateIsGreater() {
+            const x = parseInt(document.getElementById('isGreater-x').value) || 0;
+            const y = parseInt(document.getElementById('isGreater-y').value) || 0;
+            const result = isGreater(x, y);
+
+            const resultDiv = document.getElementById('isGreater-result');
+            resultDiv.textContent = result === 1 ? `${x} > ${y} ✓` : `${x} ≤ ${y} ✗`;
+            resultDiv.style.color = result === 1 ? '#4CAF50' : '#f44336';
+
+            const sign_x = (x >> 31) & 1;
+            const sign_y = (y >> 31) & 1;
+            const diff = y + (~x + 1);
+            const same_sign = sign_x === sign_y;
+
+            let analysis = `x的符号: ${sign_x === 1 ? '负' : '正'}\n`;
+            analysis += `y的符号: ${sign_y === 1 ? '负' : '正'}\n`;
+            analysis += `符号相同: ${same_sign ? '是' : '否'}\n`;
+            analysis += `y - x = ${diff}\n`;
+            analysis += `结论: ${result === 1 ? 'x > y' : 'x ≤ y'}`;
+
+            document.getElementById('isGreater-analysis').textContent = analysis;
+        }
+
+        // ============ tmin 函数 ============
+        function tmin() {
+            return 1 << 31;
+        }
+
+        function calculateTmin() {
+            const result = tmin();
+
+            document.getElementById('tmin-result-dec').textContent = result;
+            document.getElementById('tmin-result-hex').textContent = formatHex(result);
+            document.getElementById('tmin-bits').innerHTML = createBitDisplayWithLabels(intToBinaryArray(result), [31]);
+        }
+
+        // ============ plusOne 函数 ============
+        function plusOne(x) {
+            return x + 1;
+        }
+
+        function calculatePlusOne() {
+            const x = parseInt(document.getElementById('plusOne-x').value) || 0;
+            const result = plusOne(x);
+
+            document.getElementById('plusOne-result-dec').textContent = result;
+            document.getElementById('plusOne-result-hex').textContent = formatHex(result);
+
+            document.getElementById('plusOne-input-bits').innerHTML = createBitDisplayWithLabels(intToBinaryArray(x), []);
+            document.getElementById('plusOne-output-bits').innerHTML = createBitDisplayWithLabels(intToBinaryArray(result), []);
+        }
+
+        // ============ 页面初始化 ============
+        window.onload = function() {
+            window.scrollTo(0, 0);
+            // 初始化新增函数的显示
+            calculateGreatestBitPos();
+            calculateLeastBitPos();
+            calculateIsNegative();
+            calculateIsGreater();
+            calculateTmin();
+            calculatePlusOne();
+        };
+    </script>
+</body>
+</html>
