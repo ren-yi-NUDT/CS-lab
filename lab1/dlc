@@ -1,0 +1,11 @@
+#!/bin/bash
+# dlc - 运行 Data Lab Checker 检查 bits.c
+
+echo "=== Data Lab Checker ==="
+echo ""
+python3 lab1/dlc.py lab1/bits.c
+
+if [ $? -eq 0 ]; then
+    echo ""
+    echo "✓ 代码规范检查通过"
+fi

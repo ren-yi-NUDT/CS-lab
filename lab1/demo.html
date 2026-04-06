@@ -508,19 +508,6 @@
 }
             </div>
 
-            <div class="controls">
-                <label>x (十进制):</label>
-                <input type="number" id="greatestBitPos-x" value="96">
-                <button onclick="calculateGreatestBitPos()">计算</button>
-            </div>
-
-            <div class="result-box">
-                <div class="result-label">结果 (十进制):</div>
-                <div class="result-value" id="greatestBitPos-result-dec">-</div>
-                <div class="result-label" style="margin-top: 10px;">结果 (十六进制):</div>
-                <div class="result-value" id="greatestBitPos-result-hex">-</div>
-            </div>
-
             <div class="legend">
                 <div class="legend-item">
                     <div class="legend-color" style="background: #e0e0e0;"></div>
@@ -536,16 +523,18 @@
                 </div>
             </div>
 
-            <div id="greatestBitPos-input-bits"></div>
-            <div id="greatestBitPos-output-bits"></div>
+            <div class="controls">
+                <label>x (十进制):</label>
+                <input type="number" id="greatestBitPos-x" value="96">
+                <button onclick="animateGreatestBitPos()">▶️ 开始演示</button>
+                <button onclick="resetGreatestBitPos()">🔄 重置</button>
+            </div>
 
-            <div class="explanation">
-                <div class="explanation-title">💡 原理说明:</div>
-                <div class="explanation-text">
-                    使用右传播技术：将最高位1向右传播，使所有低位都变成1。<br>
-                    公式: <span class="formula">temp ^ ((temp >> 1) & ~(1 << 31))</span><br>
-                    其中 temp 是通过多次 x | (x >> n) 传播得到的全1模式。
-                </div>
+            <div id="greatestBitPos-steps"></div>
+
+            <div class="result-box">
+                <div class="result-label">结果</div>
+                <div id="greatestBitPos-result">输入数字并点击"开始演示"</div>
             </div>
         </div>
 
@@ -560,19 +549,6 @@
 }
             </div>
 
-            <div class="controls">
-                <label>x (十进制):</label>
-                <input type="number" id="leastBitPos-x" value="96">
-                <button onclick="calculateLeastBitPos()">计算</button>
-            </div>
-
-            <div class="result-box">
-                <div class="result-label">结果 (十进制):</div>
-                <div class="result-value" id="leastBitPos-result-dec">-</div>
-                <div class="result-label" style="margin-top: 10px;">结果 (十六进制):</div>
-                <div class="result-value" id="leastBitPos-result-hex">-</div>
-            </div>
-
             <div class="legend">
                 <div class="legend-item">
                     <div class="legend-color" style="background: #e0e0e0;"></div>
@@ -588,16 +564,18 @@
                 </div>
             </div>
 
-            <div id="leastBitPos-input-bits"></div>
-            <div id="leastBitPos-output-bits"></div>
+            <div class="controls">
+                <label>x (十进制):</label>
+                <input type="number" id="leastBitPos-x" value="96">
+                <button onclick="animateLeastBitPos()">▶️ 开始演示</button>
+                <button onclick="resetLeastBitPos()">🔄 重置</button>
+            </div>
 
-            <div class="explanation">
-                <div class="explanation-title">💡 原理说明:</div>
-                <div class="explanation-text">
-                    利用 x & (-x) 的经典位操作技巧。<br>
-                    公式: <span class="formula">x & (~x + 1)</span><br>
-                    因为 -x = ~x + 1（补码表示），x 与 -x 按位与后只有最低位的1保留下来。
-                </div>
+            <div id="leastBitPos-steps"></div>
+
+            <div class="result-box">
+                <div class="result-label">结果</div>
+                <div id="leastBitPos-result">输入数字并点击"开始演示"</div>
             </div>
         </div>
 
@@ -610,17 +588,6 @@
   <span class="comment">/* 负数的符号位(第31位)为1 */</span>
   <span class="keyword">return</span> (x &gt;&gt; 31) &amp; 1;
 }
-            </div>
-
-            <div class="controls">
-                <label>x (十进制):</label>
-                <input type="number" id="isNegative-x" value="-5">
-                <button onclick="calculateIsNegative()">判断</button>
-            </div>
-
-            <div class="result-box">
-                <div class="result-label">结果:</div>
-                <div class="result-value" id="isNegative-result">-</div>
             </div>
 
             <div class="legend">
@@ -638,14 +605,29 @@
                 </div>
             </div>
 
-            <div id="isNegative-bits"></div>
+            <div class="controls">
+                <label>x (十进制):</label>
+                <input type="number" id="isNegative-x" value="-5">
+                <button onclick="animateIsNegative()">▶️ 开始演示</button>
+                <button onclick="resetIsNegative()">🔄 重置</button>
+            </div>
 
-            <div class="explanation">
-                <div class="explanation-title">💡 原理说明:</div>
-                <div class="explanation-text">
-                    负数的符号位（第31位）为1，正数和0的符号位为0。<br>
-                    公式: <span class="formula">(x >> 31) & 1</span><br>
-                    算术右移31位后，最低位即为原数的符号位。
+            <div id="isNegative-steps"></div>
+
+            <div class="result-box">
+                <div class="result-label">结果</div>
+                <div id="isNegative-result">输入数字并点击"开始演示"</div>
+            </div>
+
+            <!-- 快速测试区 -->
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 2px dashed #ddd;">
+                <h3 style="color: #667eea; margin-bottom: 15px;">🧪 快速测试</h3>
+                <div class="controls">
+                    <button onclick="quickTestNegative(-1)">测试 -1</button>
+                    <button onclick="quickTestNegative(0)">测试 0</button>
+                    <button onclick="quickTestNegative(1)">测试 1</button>
+                    <button onclick="quickTestNegative(100)">测试 100</button>
+                    <button onclick="quickTestNegative(-100)">测试 -100</button>
                 </div>
             </div>
         </div>
@@ -666,6 +648,21 @@
 }
             </div>
 
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #e0e0e0;"></div>
+                    <span>0 位</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #667eea;"></div>
+                    <span>1 位</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffc107;"></div>
+                    <span>符号位</span>
+                </div>
+            </div>
+
             <div class="controls">
                 <div class="two-col">
                     <div>
@@ -677,25 +674,15 @@
                         <input type="number" id="isGreater-y" value="4">
                     </div>
                 </div>
-                <button onclick="calculateIsGreater()" style="margin-top: 10px;">比较</button>
+                <button onclick="animateIsGreater()" style="margin-top: 10px;">▶️ 开始演示</button>
+                <button onclick="resetIsGreater()" style="margin-top: 10px;">🔄 重置</button>
             </div>
+
+            <div id="isGreater-steps"></div>
 
             <div class="result-box">
-                <div class="result-label">结果:</div>
-                <div class="result-value" id="isGreater-result">-</div>
-            </div>
-
-            <div id="isGreater-analysis" style="background: #2d2d2d; color: #4CAF50; padding: 15px; border-radius: 8px; font-family: monospace; white-space: pre-line; margin-top: 15px;"></div>
-
-            <div class="explanation">
-                <div class="explanation-title">💡 原理说明:</div>
-                <div class="explanation-text">
-                    需要考虑溢出情况。分三种情况：<br>
-                    1. x正y负：直接返回1<br>
-                    2. x负y正：直接返回0<br>
-                    3. 同号：计算 y - x，如果结果为负且不相等，则 x > y<br>
-                    公式涉及符号位比较和差值的符号判断。
-                </div>
+                <div class="result-label">结果</div>
+                <div id="isGreater-result">输入数字并点击"开始演示"</div>
             </div>
         </div>
 
@@ -708,17 +695,6 @@
   <span class="comment">/* 最小补码整数是 0x80000000 */</span>
   <span class="keyword">return</span> 1 &lt;&lt; 31;
 }
-            </div>
-
-            <div class="controls">
-                <button onclick="calculateTmin()">获取 Tmin</button>
-            </div>
-
-            <div class="result-box">
-                <div class="result-label">Tmin (十进制):</div>
-                <div class="result-value" id="tmin-result-dec">-</div>
-                <div class="result-label" style="margin-top: 10px;">Tmin (十六进制):</div>
-                <div class="result-value" id="tmin-result-hex">-</div>
             </div>
 
             <div class="legend">
@@ -736,15 +712,16 @@
                 </div>
             </div>
 
-            <div id="tmin-bits"></div>
+            <div class="controls">
+                <button onclick="animateTmin()">▶️ 开始演示</button>
+                <button onclick="resetTmin()">🔄 重置</button>
+            </div>
 
-            <div class="explanation">
-                <div class="explanation-title">💡 原理说明:</div>
-                <div class="explanation-text">
-                    最小补码整数是 0x80000000，即 1 << 31。<br>
-                    公式: <span class="formula">1 << 31</span><br>
-                    在32位补码表示中，这是唯一一个等于自己负数的数。
-                </div>
+            <div id="tmin-steps"></div>
+
+            <div class="result-box">
+                <div class="result-label">结果</div>
+                <div id="tmin-result">点击"开始演示"查看动画</div>
             </div>
         </div>
 
@@ -759,19 +736,6 @@
 }
             </div>
 
-            <div class="controls">
-                <label>x (十进制):</label>
-                <input type="number" id="plusOne-x" value="5">
-                <button onclick="calculatePlusOne()">计算</button>
-            </div>
-
-            <div class="result-box">
-                <div class="result-label">x + 1 (十进制):</div>
-                <div class="result-value" id="plusOne-result-dec">-</div>
-                <div class="result-label" style="margin-top: 10px;">x + 1 (十六进制):</div>
-                <div class="result-value" id="plusOne-result-hex">-</div>
-            </div>
-
             <div class="legend">
                 <div class="legend-item">
                     <div class="legend-color" style="background: #e0e0e0;"></div>
@@ -781,25 +745,35 @@
                     <div class="legend-color" style="background: #667eea;"></div>
                     <span>1 位</span>
                 </div>
-            </div>
-
-            <div class="two-col">
-                <div>
-                    <h3 style="color: #667eea; margin-bottom: 10px;">输入 x:</h3>
-                    <div id="plusOne-input-bits"></div>
-                </div>
-                <div>
-                    <h3 style="color: #667eea; margin-bottom: 10px;">输出 x + 1:</h3>
-                    <div id="plusOne-output-bits"></div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffc107;"></div>
+                    <span>变化位</span>
                 </div>
             </div>
 
-            <div class="explanation">
-                <div class="explanation-title">💡 原理说明:</div>
-                <div class="explanation-text">
-                    最简单的位操作函数之一，直接返回 x + 1。<br>
-                    公式: <span class="formula">x + 1</span><br>
-                    虽然看起来简单，但需要理解加法在补码表示中的实现。
+            <div class="controls">
+                <label>x (十进制):</label>
+                <input type="number" id="plusOne-x" value="5">
+                <button onclick="animatePlusOne()">▶️ 开始演示</button>
+                <button onclick="resetPlusOne()">🔄 重置</button>
+            </div>
+
+            <div id="plusOne-steps"></div>
+
+            <div class="result-box">
+                <div class="result-label">结果</div>
+                <div id="plusOne-result">输入数字并点击"开始演示"</div>
+            </div>
+
+            <!-- 快速测试区 -->
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 2px dashed #ddd;">
+                <h3 style="color: #667eea; margin-bottom: 15px;">🧪 快速测试</h3>
+                <div class="controls">
+                    <button onclick="quickTestPlusOne(0)">测试 0</button>
+                    <button onclick="quickTestPlusOne(-1)">测试 -1</button>
+                    <button onclick="quickTestPlusOne(1)">测试 1</button>
+                    <button onclick="quickTestPlusOne(127)">测试 127</button>
+                    <button onclick="quickTestPlusOne(2147483647)">测试 TMax</button>
                 </div>
             </div>
         </div>
@@ -1022,6 +996,8 @@
         }
 
         // ============ greatestBitPos 函数 ============
+        let greatestBitPosAnimationRunning = false;
+
         function greatestBitPos(x) {
             let temp = x;
             temp = temp | (temp >> 1);
@@ -1032,58 +1008,209 @@
             return temp ^ ((temp >>> 1) & ~(1 << 31));
         }
 
-        function calculateGreatestBitPos() {
+        async function animateGreatestBitPos() {
+            if (greatestBitPosAnimationRunning) return;
+            greatestBitPosAnimationRunning = true;
+
             const x = parseInt(document.getElementById('greatestBitPos-x').value) || 0;
-            const result = greatestBitPos(x);
+            const stepsDiv = document.getElementById('greatestBitPos-steps');
+            const resultDiv = document.getElementById('greatestBitPos-result');
+            stepsDiv.innerHTML = '';
+            resultDiv.innerHTML = '演示中...';
 
-            document.getElementById('greatestBitPos-result-dec').textContent = result;
-            document.getElementById('greatestBitPos-result-hex').textContent = formatHex(result);
+            await sleep(300);
 
+            // 步骤1: 显示输入值
+            let step = createStep(1, `输入值 x = ${x}`, formatHex(x));
+            step += createBitDisplayWithLabels(intToBinaryArray(x), []);
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
+
+            // 步骤2-6: 右传播过程
+            let temp = x;
+            const shifts = [1, 2, 4, 8, 16];
+            let stepNum = 2;
+
+            for (let i = 0; i < shifts.length; i++) {
+                const shift = shifts[i];
+                const prev = temp;
+                temp = temp | (temp >> shift);
+                step += createStep(stepNum, `执行 temp | (temp >> ${shift})`, '将1位向右传播');
+                step += `<div class="value-display">${formatHex(temp)}</div>`;
+                step += createBitDisplayWithLabels(intToBinaryArray(temp), []);
+                stepsDiv.innerHTML = step;
+                await sleep(1000);
+                stepNum++;
+            }
+
+            // 步骤7: 计算最终结果
+            const tempShifted = (temp >>> 1) & ~(1 << 31);
+            step += createStep(stepNum, '执行 temp ^ ((temp >> 1) & ~(1 << 31))', '异或得到最高位');
+            step += `<div class="value-display">temp >> 1 = ${formatHex(tempShifted)}</div>`;
+            stepsDiv.innerHTML = step;
+            await sleep(1000);
+
+            const result = temp ^ tempShifted;
+
+            // 找到最高位位置
             const xBits = (x >>> 0).toString(2).padStart(32, '0');
             const msbPos = xBits.indexOf('1');
-            const highlightBits = msbPos >= 0 ? [31 - msbPos] : [];
 
-            document.getElementById('greatestBitPos-input-bits').innerHTML = '<h3 style="color: #667eea; margin-bottom: 10px;">输入 x:</h3>' + createBitDisplayWithLabels(intToBinaryArray(x), []);
-            document.getElementById('greatestBitPos-output-bits').innerHTML = '<h3 style="color: #667eea; margin-bottom: 10px;">结果掩码:</h3>' + createBitDisplayWithLabels(intToBinaryArray(result), highlightBits);
+            step += createStep(stepNum + 1, '最终结果', `最高有效1位在第 ${31 - msbPos} 位`);
+            step += createBitDisplayWithLabels(intToBinaryArray(result), [31 - msbPos]);
+            stepsDiv.innerHTML = step;
+            await sleep(500);
+
+            resultDiv.innerHTML = `
+                <div class="result-value success">greatestBitPos(${x}) = ${result}</div>
+                <div class="value-display">${formatHex(result)}</div>
+                <p style="margin-top: 10px; color: #666;">最高有效1位在第 ${31 - msbPos} 位</p>
+            `;
+
+            greatestBitPosAnimationRunning = false;
+        }
+
+        function resetGreatestBitPos() {
+            document.getElementById('greatestBitPos-steps').innerHTML = '';
+            document.getElementById('greatestBitPos-result').innerHTML = '输入数字并点击"开始演示"';
         }
 
         // ============ leastBitPos 函数 ============
+        let leastBitPosAnimationRunning = false;
+
         function leastBitPos(x) {
             return x & (~x + 1);
         }
 
-        function calculateLeastBitPos() {
+        async function animateLeastBitPos() {
+            if (leastBitPosAnimationRunning) return;
+            leastBitPosAnimationRunning = true;
+
             const x = parseInt(document.getElementById('leastBitPos-x').value) || 0;
-            const result = leastBitPos(x);
+            const stepsDiv = document.getElementById('leastBitPos-steps');
+            const resultDiv = document.getElementById('leastBitPos-result');
+            stepsDiv.innerHTML = '';
+            resultDiv.innerHTML = '演示中...';
 
-            document.getElementById('leastBitPos-result-dec').textContent = result;
-            document.getElementById('leastBitPos-result-hex').textContent = formatHex(result);
+            await sleep(300);
 
+            // 步骤1: 显示输入值
+            let step = createStep(1, `输入值 x = ${x}`, formatHex(x));
+            step += createBitDisplayWithLabels(intToBinaryArray(x), []);
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
+
+            // 步骤2: 计算 ~x
+            const notX = ~x;
+            step += createStep(2, '执行 ~x', '对x按位取反');
+            step += `<div class="value-display">${formatHex(notX)}</div>`;
+            step += createBitDisplayWithLabels(intToBinaryArray(notX), []);
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
+
+            // 步骤3: 计算 ~x + 1 (即 -x)
+            const negX = notX + 1;
+            step += createStep(3, '执行 ~x + 1', '得到 -x（补码表示）');
+            step += `<div class="value-display">-x = ${formatHex(negX)}</div>`;
+            step += createBitDisplayWithLabels(intToBinaryArray(negX), []);
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
+
+            // 步骤4: 计算 x & (-x)
+            const result = x & negX;
+            step += createStep(4, '执行 x & (~x + 1)', '按位与，保留最低位1');
+            step += `<div class="value-display">${formatHex(result)}</div>`;
+            stepsDiv.innerHTML = step;
+            await sleep(500);
+
+            // 找到最低位位置
             const xBits = (x >>> 0).toString(2).padStart(32, '0');
             const lsbPos = xBits.lastIndexOf('1');
-            const highlightBits = lsbPos >= 0 ? [31 - lsbPos] : [];
 
-            document.getElementById('leastBitPos-input-bits').innerHTML = '<h3 style="color: #667eea; margin-bottom: 10px;">输入 x:</h3>' + createBitDisplayWithLabels(intToBinaryArray(x), []);
-            document.getElementById('leastBitPos-output-bits').innerHTML = '<h3 style="color: #667eea; margin-bottom: 10px;">结果掩码:</h3>' + createBitDisplayWithLabels(intToBinaryArray(result), highlightBits);
+            step += createStep(5, '最终结果', `最低有效1位在第 ${31 - lsbPos} 位`);
+            step += createBitDisplayWithLabels(intToBinaryArray(result), [31 - lsbPos]);
+            stepsDiv.innerHTML = step;
+
+            resultDiv.innerHTML = `
+                <div class="result-value success">leastBitPos(${x}) = ${result}</div>
+                <div class="value-display">${formatHex(result)}</div>
+                <p style="margin-top: 10px; color: #666;">最低有效1位在第 ${31 - lsbPos} 位</p>
+            `;
+
+            leastBitPosAnimationRunning = false;
+        }
+
+        function resetLeastBitPos() {
+            document.getElementById('leastBitPos-steps').innerHTML = '';
+            document.getElementById('leastBitPos-result').innerHTML = '输入数字并点击"开始演示"';
         }
 
         // ============ isNegative 函数 ============
+        let isNegativeAnimationRunning = false;
+
         function isNegative(x) {
             return (x >> 31) & 1;
         }
 
-        function calculateIsNegative() {
+        async function animateIsNegative() {
+            if (isNegativeAnimationRunning) return;
+            isNegativeAnimationRunning = true;
+
             const x = parseInt(document.getElementById('isNegative-x').value) || 0;
-            const result = isNegative(x);
-
+            const stepsDiv = document.getElementById('isNegative-steps');
             const resultDiv = document.getElementById('isNegative-result');
-            resultDiv.textContent = result === 1 ? '是负数 ✓' : '不是负数 ✗';
-            resultDiv.style.color = result === 1 ? '#f44336' : '#4CAF50';
+            stepsDiv.innerHTML = '';
+            resultDiv.innerHTML = '演示中...';
 
-            document.getElementById('isNegative-bits').innerHTML = createBitDisplayWithLabels(intToBinaryArray(x), [31]);
+            await sleep(300);
+
+            // 步骤1: 显示输入值
+            let step = createStep(1, `输入值 x = ${x}`, formatHex(x));
+            step += createBitDisplayWithLabels(intToBinaryArray(x), [31]);
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
+
+            // 步骤2: 算术右移31位
+            const shifted = x >> 31;
+            const signBit = shifted & 1;
+            step += createStep(2, '执行 x >> 31', '算术右移31位，符号位扩展');
+            step += `<div>右移后: ${formatHex(shifted)}</div>`;
+            step += createBitDisplayWithLabels(intToBinaryArray(shifted), [0]);
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
+
+            // 步骤3: 取最低位
+            step += createStep(3, '执行 (x >> 31) & 1', '取最低位得到符号位值');
+            step += `<div class="value-display">${shifted} & 1 = ${signBit}</div>`;
+            stepsDiv.innerHTML = step;
+            await sleep(500);
+
+            const isNeg = signBit === 1;
+            resultDiv.innerHTML = `
+                <div class="result-value ${isNeg ? 'success' : 'failure'}">
+                    isNegative(${x}) = ${signBit}
+                </div>
+                <p style="margin-top: 10px; color: #666;">
+                    ${x} ${isNeg ? '是负数 ✓' : '不是负数 ✗'}
+                </p>
+            `;
+
+            isNegativeAnimationRunning = false;
+        }
+
+        function resetIsNegative() {
+            document.getElementById('isNegative-steps').innerHTML = '';
+            document.getElementById('isNegative-result').innerHTML = '输入数字并点击"开始演示"';
+        }
+
+        function quickTestNegative(value) {
+            document.getElementById('isNegative-x').value = value;
+            animateIsNegative();
         }
 
         // ============ isGreater 函数 ============
+        let isGreaterAnimationRunning = false;
+
         function isGreater(x, y) {
             const sign_x = (x >> 31) & 1;
             const sign_y = (y >> 31) & 1;
@@ -1094,68 +1221,215 @@
             return ((same_sign & sign_diff & not_equal) | ((1 - same_sign) & (1 - sign_x))) & 1;
         }
 
-        function calculateIsGreater() {
+        async function animateIsGreater() {
+            if (isGreaterAnimationRunning) return;
+            isGreaterAnimationRunning = true;
+
             const x = parseInt(document.getElementById('isGreater-x').value) || 0;
             const y = parseInt(document.getElementById('isGreater-y').value) || 0;
-            const result = isGreater(x, y);
-
+            const stepsDiv = document.getElementById('isGreater-steps');
             const resultDiv = document.getElementById('isGreater-result');
-            resultDiv.textContent = result === 1 ? `${x} > ${y} ✓` : `${x} ≤ ${y} ✗`;
-            resultDiv.style.color = result === 1 ? '#4CAF50' : '#f44336';
+            stepsDiv.innerHTML = '';
+            resultDiv.innerHTML = '演示中...';
 
+            await sleep(300);
+
+            // 步骤1: 显示输入值
+            let step = createStep(1, `输入值 x = ${x}, y = ${y}`, `x = ${formatHex(x)}, y = ${formatHex(y)}`);
+            step += '<div class="two-col"><div>';
+            step += '<h4 style="color: #667eea;">x:</h4>';
+            step += createBitDisplayWithLabels(intToBinaryArray(x), [31]);
+            step += '</div><div>';
+            step += '<h4 style="color: #667eea;">y:</h4>';
+            step += createBitDisplayWithLabels(intToBinaryArray(y), [31]);
+            step += '</div></div>';
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
+
+            // 步骤2: 提取符号位
             const sign_x = (x >> 31) & 1;
             const sign_y = (y >> 31) & 1;
+            step += createStep(2, '提取符号位', 'sign_x = (x >> 31) & 1, sign_y = (y >> 31) & 1');
+            step += `<div>sign_x = ${sign_x} (${sign_x === 1 ? '负' : '非负'}), sign_y = ${sign_y} (${sign_y === 1 ? '负' : '非负'})</div>`;
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
+
+            // 步骤3: 计算差值
             const diff = y + (~x + 1);
-            const same_sign = sign_x === sign_y;
+            step += createStep(3, '计算 y - x', 'diff = y + (~x + 1)');
+            step += `<div>~x + 1 = ${formatHex(~x + 1)}</div>`;
+            step += `<div>y - x = ${diff}</div>`;
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
 
-            let analysis = `x的符号: ${sign_x === 1 ? '负' : '正'}\n`;
-            analysis += `y的符号: ${sign_y === 1 ? '负' : '正'}\n`;
-            analysis += `符号相同: ${same_sign ? '是' : '否'}\n`;
-            analysis += `y - x = ${diff}\n`;
-            analysis += `结论: ${result === 1 ? 'x > y' : 'x ≤ y'}`;
+            // 步骤4: 判断符号是否相同
+            const same_sign = sign_x === sign_y ? 1 : 0;
+            step += createStep(4, '判断符号是否相同', 'same_sign = !(sign_x ^ sign_y)');
+            step += `<div>sign_x ^ sign_y = ${sign_x ^ sign_y}</div>`;
+            step += `<div>same_sign = ${same_sign}</div>`;
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
 
-            document.getElementById('isGreater-analysis').textContent = analysis;
+            // 步骤5: 根据情况计算结果
+            const sign_diff = (diff >> 31) & 1;
+            const not_equal = diff !== 0 ? 1 : 0;
+            let result, reason;
+
+            if (same_sign === 1) {
+                // 同号情况：比较差值
+                result = (sign_diff & not_equal) & 1;
+                reason = `同号情况: 比较 y - x 的符号<br>diff = ${diff}, sign_diff = ${sign_diff}, not_equal = ${not_equal}<br>结果 = ${result}`;
+            } else {
+                // 异号情况：x正则大
+                result = 1 - sign_x;
+                reason = `异号情况: x为${sign_x === 1 ? '负' : '正'}, y为${sign_y === 1 ? '负' : '正'}<br>结果 = ${result}`;
+            }
+
+            step += createStep(5, '计算最终结果', reason);
+            stepsDiv.innerHTML = step;
+            await sleep(500);
+
+            const isGreater = result === 1;
+            resultDiv.innerHTML = `
+                <div class="result-value ${isGreater ? 'success' : 'failure'}">
+                    isGreater(${x}, ${y}) = ${result}
+                </div>
+                <p style="margin-top: 10px; color: #666;">
+                    ${x} ${isGreater ? '>' : '≤'} ${y} ${isGreater ? '✓' : '✗'}
+                </p>
+            `;
+
+            isGreaterAnimationRunning = false;
+        }
+
+        function resetIsGreater() {
+            document.getElementById('isGreater-steps').innerHTML = '';
+            document.getElementById('isGreater-result').innerHTML = '输入数字并点击"开始演示"';
         }
 
         // ============ tmin 函数 ============
+        let tminAnimationRunning = false;
+
         function tmin() {
             return 1 << 31;
         }
 
-        function calculateTmin() {
-            const result = tmin();
+        async function animateTmin() {
+            if (tminAnimationRunning) return;
+            tminAnimationRunning = true;
 
-            document.getElementById('tmin-result-dec').textContent = result;
-            document.getElementById('tmin-result-hex').textContent = formatHex(result);
-            document.getElementById('tmin-bits').innerHTML = createBitDisplayWithLabels(intToBinaryArray(result), [31]);
+            const stepsDiv = document.getElementById('tmin-steps');
+            const resultDiv = document.getElementById('tmin-result');
+            stepsDiv.innerHTML = '';
+            resultDiv.innerHTML = '演示中...';
+
+            await sleep(300);
+
+            // 步骤1: 初始值
+            let step = createStep(1, '初始值: 数字 1', '1 (二进制)');
+            step += createBitDisplayWithLabels(intToBinaryArray(1), [0]);
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
+
+            // 步骤2: 左移31位
+            step += createStep(2, '执行 1 << 31', '将1左移31位，得到最小负数 TMin');
+            const tmin_val = 1 << 31;
+            step += `<div class="value-display">${formatHex(tmin_val)}</div>`;
+            step += createBitDisplayWithLabels(intToBinaryArray(tmin_val), [31]);
+            stepsDiv.innerHTML = step;
+            await sleep(500);
+
+            resultDiv.innerHTML = `
+                <div class="result-value success">TMin = ${tmin_val}</div>
+                <div class="value-display">${formatHex(tmin_val)}</div>
+                <p style="margin-top: 10px; color: #666;">这是32位补码表示的最小负整数（-2147483648）</p>
+                <p style="margin-top: 5px; color: #999;">注意：TMin 是唯一一个等于自己负数的数</p>
+            `;
+
+            tminAnimationRunning = false;
+        }
+
+        function resetTmin() {
+            document.getElementById('tmin-steps').innerHTML = '';
+            document.getElementById('tmin-result').innerHTML = '点击"开始演示"查看动画';
         }
 
         // ============ plusOne 函数 ============
+        let plusOneAnimationRunning = false;
+
         function plusOne(x) {
             return x + 1;
         }
 
-        function calculatePlusOne() {
+        async function animatePlusOne() {
+            if (plusOneAnimationRunning) return;
+            plusOneAnimationRunning = true;
+
             const x = parseInt(document.getElementById('plusOne-x').value) || 0;
-            const result = plusOne(x);
+            const stepsDiv = document.getElementById('plusOne-steps');
+            const resultDiv = document.getElementById('plusOne-result');
+            stepsDiv.innerHTML = '';
+            resultDiv.innerHTML = '演示中...';
 
-            document.getElementById('plusOne-result-dec').textContent = result;
-            document.getElementById('plusOne-result-hex').textContent = formatHex(result);
+            await sleep(300);
 
-            document.getElementById('plusOne-input-bits').innerHTML = createBitDisplayWithLabels(intToBinaryArray(x), []);
-            document.getElementById('plusOne-output-bits').innerHTML = createBitDisplayWithLabels(intToBinaryArray(result), []);
+            // 步骤1: 显示输入值
+            let step = createStep(1, `输入值 x = ${x}`, formatHex(x));
+            step += createBitDisplayWithLabels(intToBinaryArray(x), []);
+            stepsDiv.innerHTML = step;
+            await sleep(1500);
+
+            // 步骤2: 加1操作
+            const result = x + 1;
+            step += createStep(2, '执行 x + 1', '加1操作');
+
+            // 找出变化的位
+            const changedBits = [];
+            for (let i = 0; i < 32; i++) {
+                if (((x >>> i) & 1) !== ((result >>> i) & 1)) {
+                    changedBits.push(i);
+                }
+            }
+
+            step += `<div class="value-display">${formatHex(result)}</div>`;
+            step += '<div class="two-col"><div>';
+            step += '<h4 style="color: #667eea;">x:</h4>';
+            step += createBitDisplayWithLabels(intToBinaryArray(x), []);
+            step += '</div><div>';
+            step += '<h4 style="color: #667eea;">x + 1:</h4>';
+            step += createBitDisplayWithLabels(intToBinaryArray(result), changedBits);
+            step += '</div></div>';
+            stepsDiv.innerHTML = step;
+            await sleep(500);
+
+            // 检查溢出情况
+            let overflowNote = '';
+            if (x === 2147483647) {
+                overflowNote = '<p style="margin-top: 10px; color: #f44336;">⚠️ 溢出！TMax + 1 = TMin</p>';
+            }
+
+            resultDiv.innerHTML = `
+                <div class="result-value success">plusOne(${x}) = ${result}</div>
+                <div class="value-display">${formatHex(result)}</div>
+                ${overflowNote}
+            `;
+
+            plusOneAnimationRunning = false;
+        }
+
+        function resetPlusOne() {
+            document.getElementById('plusOne-steps').innerHTML = '';
+            document.getElementById('plusOne-result').innerHTML = '输入数字并点击"开始演示"';
+        }
+
+        function quickTestPlusOne(value) {
+            document.getElementById('plusOne-x').value = value;
+            animatePlusOne();
         }
 
         // ============ 页面初始化 ============
         window.onload = function() {
             window.scrollTo(0, 0);
-            // 初始化新增函数的显示
-            calculateGreatestBitPos();
-            calculateLeastBitPos();
-            calculateIsNegative();
-            calculateIsGreater();
-            calculateTmin();
-            calculatePlusOne();
         };
     </script>
 </body>

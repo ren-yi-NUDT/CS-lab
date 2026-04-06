@@ -129,77 +129,6 @@ int bitAnd(int x, int y) {
 
 
 
-/*
- * bitXor - x^y using only ~ and &
- *   Example: bitXor(4, 5) = 1
- *   Legal ops: ~ &
- *   Max ops: 14
- *   Rating: 2
- */
-int bitXor(int x, int y) {
-
-  return 2;
-
-}
-
-
-
-
-
-
-/*
- * evenBits - return word with all even-numbered bits set to 1
- *   Legal ops: ! ~ & ^ | + << >>
- *   Max ops: 8
- *   Rating: 2
- */
-int evenBits(void) {
-
-  return 2;
-
-}
-
-
-
-
-
-
-/*
- * getByte - Extract byte n from word x
- *   Bytes numbered from 0 (LSB) to 3 (MSB)
- *   Examples: getByte(0x12345678,1) = 0x56
- *   Legal ops: ! ~ & ^ | + << >>
- *   Max ops: 6
- *   Rating: 2
- */
-int getByte(int x, int n) {
-
-  return 2;
-
-}
-
-
-
-
-
-
-/*
- * bitMask - Generate a bitmask consisting of all 1's
- *   from lowbit to highbit and 0's everywhere else.
- *   Examples: bitMask(5,3) = 0x38
- *   Assume 0 <= lowbit <= 31, and 0 <= highbit <= 31
- *   If lowbit > highbit, then mask should be all 0's
- *   Legal ops: ! ~ & ^ | + << >>
- *   Max ops: 16
- *   Rating: 3
- */
-int bitMask(int highbit, int lowbit) {
-
-  return 2;
-
-}
-
-
 
 
 
@@ -257,22 +186,6 @@ int logicalNeg(int x) {
 
 
 
-/*
- * minusOne - return a value of -1
- *   Legal ops: ! ~ & ^ | + << >>
- *   Max ops: 2
- *   Rating: 1
- */
-int minusOne(void) {
-
-  return 2;
-
-}
-
-
-
-
-
 
 /*
  * TMax - return maximum two's complement integer
@@ -284,23 +197,6 @@ int tmax(void) {
   return ~(1 << 31);
 }
 
-
-
-
-
-
-/*
- * negate - return -x
- *   Example: negate(1) = -1.
- *   Legal ops: ! ~ & ^ | + << >>
- *   Max ops: 5
- *   Rating: 2
- */
-int negate(int x) {
-
-  return 2;
-
-}
 
 
 
@@ -323,37 +219,6 @@ int isPositive(int x) {
 
 
 
-/*
- * isLess - if x < y  then return 1, else return 0
- *   Example: isLess(4,5) = 1.
- *   Legal ops: ! ~ & ^ | + << >>
- *   Max ops: 24
- *   Rating: 3
- */
-int isLess(int x, int y) {
-
-  return 2;
-
-}
-
-
-
-
-
-
-/*
- * sm2tc - Convert from sign-magnitude to two's complement
- *   where the MSB is the sign bit
- *   Example: sm2tc(0x80000005) = -5.
- *   Legal ops: ! ~ & ^ | + << >>
- *   Max ops: 15
- *   Rating: 4
- */
-int sm2tc(int x) {
-
-  return 2;
-
-}
 
 
 /*
