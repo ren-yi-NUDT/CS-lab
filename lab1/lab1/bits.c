@@ -125,6 +125,59 @@ int bitAnd(int x, int y) {
 }
 
 
+/*
+ * bitXor - x^y using only ~ and &
+ *   Example: bitXor(4, 5) = 1
+ *   Legal ops: ~ &
+ *   Max ops: 14
+ *   Rating: 2
+ */
+int bitXor(int x, int y) {
+  return ~(~(x & ~y) & ~(~x & y));
+}
+
+
+/*
+ * evenBits - return word with all even-numbered bits set to 1
+ *   Legal ops: ! ~ & ^ | + << >>
+ *   Max ops: 8
+ *   Rating: 2
+ */
+int evenBits(void) {
+  int bits = 0x55;
+  bits = (bits << 8) | bits;
+  return (bits << 16) | bits;
+}
+
+
+/*
+ * getByte - Extract byte n from word x
+ *   Bytes numbered from 0 (LSB) to 3 (MSB)
+ *   Examples: getByte(0x12345678,1) = 0x56
+ *   Legal ops: ! ~ & ^ | + << >>
+ *   Max ops: 6
+ *   Rating: 2
+ */
+int getByte(int x, int n) {
+  return (x >> (n << 3)) & 0xFF;
+}
+
+
+/*
+ * bitMask - Generate a mask consisting of all 1's
+ *   lowbit and highbit
+ *   Examples: bitMask(5,3) = 0x38
+ *   Legal ops: ! ~ & ^ | + << >>
+ *   Max ops: 16
+ *   Rating: 3
+ */
+int bitMask(int highbit, int lowbit) {
+  int high_mask = ~(~0 << highbit << 1);
+  int low_mask = ~0 << lowbit;
+  return high_mask & low_mask;
+}
+
+
 
 
 
@@ -181,6 +234,17 @@ int logicalNeg(int x) {
 }
 
 
+/*
+ * minusOne - returns a value of -1
+ *   Legal ops: ! ~ & ^ | + << >>
+ *   Max ops: 2
+ *   Rating: 1
+ */
+int minusOne(void) {
+  return ~0;
+}
+
+
 
 
 
@@ -195,6 +259,32 @@ int logicalNeg(int x) {
  */
 int tmax(void) {
   return ~(1 << 31);
+}
+
+
+/*
+ * negate - return -x
+ *   Example: negate(1) = -1.
+ *   Legal ops: ! ~ & ^ | + << >>
+ *   Max ops: 5
+ *   Rating: 2
+ */
+int negate(int x) {
+  return ~x + 1;
+}
+
+
+/*
+ * sm2tc - Convert from sign-magnitude to two's complement
+ *   where the MSB is the sign bit
+ *   Legal ops: ! ~ & ^ | + << >>
+ *   Max ops: 15
+ *   Rating: 4
+ */
+int sm2tc(int x) {
+  int sign = x >> 31;
+  int abs_val = x & 0x7FFFFFFF;
+  return (abs_val ^ sign) + (sign & 1);
 }
 
 
@@ -282,6 +372,24 @@ int isGreater(int x, int y) {
   int not_equal = !!diff;
 
   return ((same_sign & sign_diff & not_equal) | (!same_sign & !sign_x)) & 1;
+}
+
+
+/*
+ * isLess - if x < y  then return 1, else return 0
+ *   Example: isLess(4,5) = 1.
+ *   Legal ops: ! ~ & ^ | + << >>
+ *   Max ops: 24
+ *   Rating: 3
+ */
+int isLess(int x, int y) {
+  int sign_x = (x >> 31) & 1;
+  int sign_y = (y >> 31) & 1;
+  int diff = y + (~x + 1);
+  int sign_diff = (diff >> 31) & 1;
+  int same_sign = !(sign_x ^ sign_y);
+  int not_equal = !!diff;
+  return ((same_sign & !sign_diff & not_equal) | (!same_sign & sign_x)) & 1;
 }
 
 
