@@ -303,7 +303,6 @@ void phase_impossible(char *input)
     //   shellcode 内容:
     //     call GenerateRandomNumber(0x400)  → rand_div 更新
     //     result = rand_div
-    //     call phase_secret()               → 打印 SOS 消息 (隐藏彩蛋)
     //     jmp 0x4018a0                       → 跳回主程序比较逻辑
     //
     //   shellcode 返回后 (0x4018a0):
@@ -312,7 +311,7 @@ void phase_impossible(char *input)
     //     if (耗时 > 1000ms)      explode_bomb()
     //
     // 在 C++ 中模拟 shellcode 的效果:
-    phase_secret();     // ★ 触发隐藏彩蛋 (原炸弹靠 shellcode call 触发)
+    // (phase_secret 移到 main 中成功消息之后打印，与老师示例输出顺序一致)
 
     // 模拟 GenerateRandomNumber(0x400) 的效果
     // shellcode 调一次, 主程序再调一次, 两次 rand_div 应该相同 = 540
@@ -392,6 +391,7 @@ int main(int argc, char *argv[])
     phase_impossible(read_line());
 
     printf("你已经通过了第5级考验，完成了不可能完成任务（终极考验）！\n");
+    phase_secret();  // 打印 SOS 消息（移到成功消息之后，与老师示例输出顺序一致）
     printf("温馨提示：炸弹还有隐藏彩蛋哦...\n");
 
     if (g_infile != stdin) fclose(g_infile);
