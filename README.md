@@ -47,6 +47,286 @@ disas phase_1           # 反汇编指定函数
 
 ---
 
+## 关键函数反编译（C++ 伪代码）
+
+以下是炸弹中各关键函数的 C++ 反编译。阅读这些代码比直接看汇编容易得多——理解逻辑后，再对照汇编就能快速定位。
+
+### 全局变量
+
+```cpp
+long long rand1_h;   // 0x408810, 随机种子高半部
+long long rand1_l;   // 0x408818, 随机种子低半部
+long long rand_div;  // 0x408820, 最近一次 rand1_h % n 的结果
+int      result;     // 0x4087f8, Phase 5 shellcode 执行结果
+```
+
+### GenerateRandomNumber — 随机数生成器
+
+每次调用更新种子，然后 `rand_div = rand1_h % n`。同一个学号每次运行产生**完全相同**的随机数序列。
+
+```cpp
+void GenerateRandomNumber(long long n) {
+    long long temp = rand1_h;
+    temp *= 0x6ac690c5;             // 乘以一个常数
+    temp += rand1_l;                // 加上低半部
+    rand1_h = temp;                 // 更新种子
+    rand_div = temp % n;            // 取模得到结果（存在全局变量中）
+}
+```
+
+### GenerateRandomString — 生成 10 字符随机字符串（Phase 1）
+
+```cpp
+void GenerateRandomString(char *buf) {
+    for (int i = 0; i <= 9; i++) {
+        GenerateRandomNumber(2);
+        buf[i] = (rand_div == 1) ? 'A' : 'a';  // 随机选大写或小写基础字符
+        GenerateRandomNumber(26);
+        buf[i] += rand_div;                      // 加上 0~25 的偏移
+    }
+    buf[10] = '\0';
+}
+```
+
+### phase_1 — 字符串比较
+
+```cpp
+void phase_1(char *input) {
+    char secret[11];
+    GenerateRandomString(secret);
+    if (strcmp(input, secret) != 0)
+        explode_bomb();
+}
+```
+
+### phase_2 — 六个整数（通过随机分发进入子函数）
+
+```cpp
+void phase_2(char *input) {
+    GenerateRandomNumber(16);
+    // 根据 rand_div (0~15) 通过跳转表分发到 phase_2_0 ~ phase_2_15
+    switch (rand_div) { ... }
+}
+```
+
+### phase_2_13 — 严格递增的正整数（学号 720028 进入的子函数）
+
+```cpp
+void phase_2_13(char *input) {
+    int a[6];
+    read_six_numbers(input, a);       // sscanf(input, "%d %d %d %d %d %d", a, ...)
+
+    // 约束 1: 首元素 = rand_div + 16
+    GenerateRandomNumber(50);
+    if (a[0] != rand_div + 16)
+        explode_bomb();
+
+    // 约束 2: 所有元素 >= 0
+    for (int i = 0; i < 6; i++)
+        if (a[i] < 0) explode_bomb();
+
+    // 约束 3: 严格递增
+    for (int i = 1; i < 6; i++)
+        if (a[i] <= a[i-1]) explode_bomb();
+}
+```
+
+### phase_3 — 整数+字符+整数（通过随机分发进入子函数）
+
+```cpp
+void phase_3(char *input) {
+    GenerateRandomNumber(14);
+    // 根据 rand_div (0~13) 分发到 phase_3_0 ~ phase_3_13
+    switch (rand_div) { ... }
+}
+```
+
+### phase_3_13 — 三个字段：数字、字符、数字
+
+```cpp
+void phase_3_13(char *input) {
+    int val1;
+    char ch;
+    int val2;
+    sscanf(input, "%d %c %d", &val1, &ch, &val2);
+
+    // 约束 1: val1 = rand_div + 0x82 (130)
+    GenerateRandomNumber(8);
+    int expected_val1 = rand_div + 130;
+    if (val1 != expected_val1)
+        explode_bomb();
+
+    // 约束 2: 根据 (val1 - 130) 做 switch，每个 case 生成期望的 char 和 val2
+    int case_idx = val1 - 130;
+    char expected_ch;
+    int expected_val2;
+    switch (case_idx) {
+        case 0: ... case 7:
+            // 每个 case 内部:
+            //   调若干次 GenerateRandomNumber 推进随机序列
+            //   GenerateRandomNumber(26); expected_ch = rand_div + 'A';
+            //   GenerateRandomNumber(300); expected_val2 = rand_div;
+            break;
+    }
+
+    if (ch != expected_ch) explode_bomb();
+    if (val2 != expected_val2) explode_bomb();
+}
+```
+
+### phase_4 — 阶乘校验（通过随机分发进入子函数）
+
+```cpp
+void phase_4(char *input) {
+    GenerateRandomNumber(20);
+    // 根据 rand_div 通过跳转表分发
+    // ⚠️ rand_div 不直接对应子函数编号！跳转表第 14 项指向 phase_4_24
+    switch (rand_div) { ... }
+}
+```
+
+### func4_2 — 阶乘函数
+
+```cpp
+long long func4_2(long long n) {
+    if (n <= 1) return 1;
+    return n * func4_2(n - 1);   // = n!
+}
+```
+
+### phase_4_24 — 阶乘查表
+
+```cpp
+void phase_4_24(char *input) {
+    int x;
+    sscanf(input, "%d", &x);
+
+    // 预置阶乘表: 4!, 5!, 6!, 7!, 8!, 9!, 10!
+    int table[7] = {24, 120, 720, 5040, 40320, 362880, 3628800};
+
+    // 约束 1: 输入范围
+    if (sscanf返回值 != 1 || x <= 0) explode_bomb();
+    if (x <= 499) explode_bomb();               // x 必须 > 499
+
+    // 约束 2: 除法取商（编译器用魔数 0x10624dd3 优化除法）
+    int quotient = x / 500;
+
+    // 约束 3: 阶乘结果 == 表中某个值
+    long long fact_result = func4_2(quotient);
+
+    GenerateRandomNumber(7);                     // rand_div ∈ {0..6}
+    if (fact_result != table[rand_div])
+        explode_bomb();
+}
+```
+
+### tohex — 十六进制字符串转字节
+
+```cpp
+void tohex(unsigned char *buf, const char *hex_str) {
+    int pos = 0;        // buf 写入位置
+    int high_nibble = 1; // 状态: 1=等待高4位, 0=等待低4位
+    int value = 0;
+
+    for (int i = 0; hex_str[i] != '\0' && hex_str[i] != '\n' && hex_str[i] != '\r'; i++) {
+        char c = hex_str[i];
+        if (!isprint(c)) continue;  // 跳过不可打印字符
+
+        int digit;
+        if (c >= '0' && c <= '9')      digit = c - '0';
+        else if (c >= 'A' && c <= 'F') digit = c - 'A' + 10;
+        else if (c >= 'a' && c <= 'f') digit = c - 'a' + 10;
+        else continue;
+
+        if (high_nibble) {
+            value = digit;          // 保存高4位
+            high_nibble = 0;
+        } else {
+            *buf++ = (value << 4) | digit;  // 拼接高低4位，写入一个字节
+            high_nibble = 1;
+        }
+    }
+    *buf = '\0';   // 末尾填零
+}
+```
+
+### check_buf_valid — XOR 校验
+
+```cpp
+int check_buf_valid(unsigned char *buf, int rand_div) {
+    unsigned char xor_result = 0;
+    for (int i = 0; i < 256; i++) {
+        xor_result ^= buf[i];
+    }
+    return (xor_result == (rand_div & 0xFF));  // 返回 1 表示通过
+}
+```
+
+### phase_impossible — Phase 5 主逻辑
+
+```cpp
+void phase_impossible(char *input) {
+    // 0. 记录开始时间（用于超时检测）
+    long long start_time = GetTickCount();
+
+    // 1. 输入长度校验: 10 < len <= 768 个十六进制字符
+    if (strlen(input) <= 9 || strlen(input) > 0x300)
+        explode_bomb();
+
+    // 2. hex 字符串 → 原始字节
+    unsigned char buf[256];
+    memset(buf, 0, 256);
+    tohex(buf, input);
+
+    // 3. XOR 校验
+    GenerateRandomNumber(0x400);
+    if (!check_buf_valid(buf, rand_div)) {
+        puts("对不起，输入的攻击指令，没有通过数据校验....");
+        explode_bomb();
+    }
+
+    // 4. 随机选择跳转方式，跳到 buf 执行（数据变成代码！）
+    GenerateRandomNumber(3);
+    switch (rand_div) {
+        case 0: goto_buf_0(buf); break;  // jmp   *buf  → 跳到 buf 执行
+        case 1: goto_buf_1(buf); break;  // push buf; ret
+        case 2: goto_buf_2(buf); break;  // mov buf,(%rsp); ret
+        default: explode_bomb();
+    }
+    // ← 上述三种方式都把 CPU 指令指针跳到了 buf 的地址
+    //    buf 里的字节被当作 x86-64 指令执行
+
+    // 如果 shellcode 没有主动跳回来，下面这行会执行
+    explode_bomb();
+
+    // --- 以下代码需要 shellcode 主动跳转回来 ---
+
+    // 5. 验证 result == 新的 rand_div
+    GenerateRandomNumber(0x400);
+    if (result != rand_div) {
+        printf("攻击目标没有达成，预期是%08lX，但是实际上是%08X\n", rand_div, result);
+        explode_bomb();
+    }
+
+    // 6. 超时检测: 执行时间必须 <= 1000ms
+    long long end_time = GetTickCount();
+    if (end_time - start_time > 1000) {
+        puts("攻击超时了，重来吧....");
+        explode_bomb();
+    }
+}
+```
+
+### phase_secret — 隐藏彩蛋（死代码，只能通过 shellcode 触发）
+
+```cpp
+void phase_secret(char *input) {
+    puts("不可能的...不可能的...指令和数据的世界已经混乱...SOS...");
+}
+```
+
+---
+
 ## 炸弹总体结构
 
 运行方式: `./bomb_linux <学号后6位>`，程序从 `bomb_<学号>.txt` 文件逐行读取答案。
@@ -69,20 +349,9 @@ disas phase_1           # 反汇编指定函数
 
 ### 分析思路
 
-阅读 `bomb_disasm.txt` 中 `<phase_1>` 的反汇编:
+对照上方 C++ 反编译的 `phase_1` 和 `GenerateRandomString`:
 
-```
-401b53 <phase_1>:
-  401b5f:  mov    %rdi,-0x18(%rbp)      # 保存 input
-  401b63:  lea    -0xb(%rbp),%rax        # 局部缓冲区(11字节)
-  401b6a:  call   GenerateRandomString   # 生成随机字符串到缓冲区
-  401b7d:  call   strcmp@plt             # strcmp(input, 随机字符串)
-  401b82:  test   %eax,%eax             # 返回值为0则相等
-  401b84:  je     401b8b                 # 相等则跳过炸弹
-  401b86:  call   explode_bomb
-```
-
-**结论**: `phase_1` 生成一个10字符随机字符串，与用户输入做 `strcmp`，不相等则爆炸。
+程序生成一个 10 字符随机字符串，与用户输入做 `strcmp`，不相等则爆炸。
 
 ### GDB 操作
 
@@ -109,14 +378,9 @@ $ gdb ./bomb_linux
 
 ### 分析思路
 
-`phase_2` 先调用 `GenerateRandomNumber(16)`，根据 `rand_div` 的值(0~15)跳转到16个不同的子函数 `phase_2_0` ~ `phase_2_15`。
+对照上方 C++ 反编译的 `phase_2` 和 `phase_2_13`:
 
-```
-401b8e <phase_2>:
-  401ba3:  call   GenerateRandomNumber   # 参数 0x10 = 16
-  401bb3:  cmp    $0xf,%rax             # rand_div > 15?
-  401bd7:  notrack jmp *%rax            # 跳转表分发到子函数
-```
+`phase_2` 先调用 `GenerateRandomNumber(16)`，根据 `rand_div` 的值(0~15)分发到 `phase_2_0` ~ `phase_2_15`。
 
 ### 第一步: 确定子关卡
 
@@ -138,33 +402,11 @@ $1 = 13
 
 ### 第二步: 分析 phase_2_13 的约束
 
-阅读 `<phase_2_13>` 的反汇编，逐步理解约束:
+对照上方 C++ 反编译的 `phase_2_13`，三个约束一目了然:
 
-**约束 1 — 首元素** (0x4026a6 ~ 0x4026c3):
-```
-4026a6:  mov    $0x32,%edi              # GenerateRandomNumber(50)
-4026ab:  call   GenerateRandomNumber
-4026b0:  mov    -0x20(%rbp),%eax       # eax = a[0]
-4026b5:  mov    rand_div,%rdx          # rdx = rand_div
-4026bc:  add    $0x10,%rdx             # rdx = rand_div + 16
-4026c0:  cmp    %rdx,%rax              # a[0] == rand_div + 16 ?
-4026c3:  je     4026ca
-4026c5:  call   explode_bomb
-```
-→ `a[0] == rand_div + 16`
-
-**约束 2 — 非负** (0x4026ca ~ 0x4026ed):
-```
-循环 i=0..5: a[i] >= 0 (test + jns)
-```
-
-**约束 3 — 严格递增** (0x4026ef ~ 0x40272b):
-```
-循环 i=1..5:
-  if a[i] < a[i-1]: explode   # jl 跳到爆炸
-  else if a[i] <= 0: explode  # test + jg，不大于0则爆炸
-```
-→ `a[i] > a[i-1]` 且 `a[i] > 0`，即**严格递增的正整数**
+1. **首元素**: `a[0] == rand_div + 16`（`GenerateRandomNumber(50)` 的结果 + 16）
+2. **非负**: 所有 6 个元素 ≥ 0
+3. **严格递增**: `a[i] > a[i-1]`，即**严格递增的正整数**
 
 ### 第三步: 提取随机数并求解
 
@@ -194,6 +436,8 @@ $2 = 28
 
 ### 分析思路
 
+对照上方 C++ 反编译的 `phase_3` 和 `phase_3_13`:
+
 和 Phase 2 类似，`phase_3` 调用 `GenerateRandomNumber(14)`，根据结果分发到 `phase_3_0` ~ `phase_3_13`。
 
 ### 第一步: 确定子关卡
@@ -214,41 +458,12 @@ $3 = 13
 
 ### 第二步: 分析 phase_3_13 的约束
 
-阅读 `<phase_3_13>` 的反汇编:
+对照上方 C++ 反编译的 `phase_3_13`:
 
-**输入格式** (0x4041e0 ~ 0x404202):
-```
-4041e0:  lea    -0x10(%rbp),%rsi    # &val2 → 第5个参数 (r8)
-4041e4:  lea    -0x11(%rbp),%rcx    # &char → 第4个参数 (rcx)
-4041e8:  lea    -0xc(%rbp),%rdx     # &val1 → 第3个参数 (rdx)
-4041f3:  lea    "%d %c %d",%rsi     # 格式串
-404202:  call   sscanf
-```
-→ `sscanf(input, "%d %c %d", &val1, &char, &val2)`
-
-**约束 1 — val1** (0x404215 ~ 0x404235):
-```
-404215:  mov    $0x8,%edi           # GenerateRandomNumber(8)
-40421a:  call   GenerateRandomNumber
-40421f:  mov    -0xc(%rbp),%eax     # val1
-404224:  mov    rand_div,%rdx
-40422b:  add    $0x82,%rdx          # rand_div + 130
-404232:  cmp    %rdx,%rax           # val1 == rand_div + 130 ?
-```
-→ `val1 = rand_div(8) + 0x82`
-
-**约束 2 — switch 计算 char 和 val2**:
-
-根据 `(val1 - 0x82)` 做 switch (0~7)。每个 case:
-1. 调若干次 `GenerateRandomNumber`（消耗随机数来推进序列）
-2. 调 `GenerateRandomNumber(26)`，`char = rand_div + 0x41`（即 'A'~'Z'）
-3. 调 `GenerateRandomNumber(300)`，`val2 == rand_div`
-
-**约束 3 — 最终 char 比较**:
-```
-期望字符存在 -0x1(%rbp)，实际输入字符在 -0x11(%rbp)
-如果两者相等则通过
-```
+1. **输入格式**: `sscanf(input, "%d %c %d", &val1, &ch, &val2)`
+2. **约束 1**: `val1 == rand_div(8) + 130`
+3. **约束 2**: 根据 `(val1 - 130)` 做 switch（0~7），每个 case 通过 `GenerateRandomNumber` 生成期望的 `ch`（'A'~'Z'）和 `val2`（0~299）
+4. **约束 3**: 输入的 `ch` 和 `val2` 必须与期望值匹配
 
 ### 第三步: 用 GDB 逐步提取
 
