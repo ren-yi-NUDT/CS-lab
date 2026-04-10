@@ -291,20 +291,340 @@ $6 = 0           # 我们输入的 val2
 
 ---
 
+## Phase 4: 阶乘校验 (随机子关卡)
+
+### 分析思路
+
+和 Phase 2/3 一样，`phase_4` 调用 `GenerateRandomNumber(20)`，根据 `rand_div` 通过跳转表分发到不同子函数。
+
+**⚠️ 跳转表陷阱**: `rand_div` 的值并不直接对应子函数编号！比如 `rand_div=14` 跳转到的不是 `phase_4_14`，而是跳转表第 14 项指向的 `phase_4_24`。必须用 GDB 确认实际跳转目标。
+
+### 第一步: 确定子关卡
+
+更新答案文件（加一行占位），在跳转表的间接跳转指令处设断点:
+
+```gdb
+(gdb) break *0x404604
+(gdb) run 720028 < bomb_720028.txt
+```
+
+断点命中后查看实际跳转目标:
+
+```gdb
+(gdb) x/i $rax
+   0x4046ec <phase_4+305>:  mov    -0x8(%rbp),%rax
+```
+
+跳转到 `0x4046ec`，查看该地址的代码:
+
+```
+4046ec:  mov    -0x8(%rbp),%rax
+4046f0:  mov    %rax,%rdi
+4046f3:  call   40548f <phase_4_24>
+```
+
+所以实际进入的是 `phase_4_24`。
+
+### 第二步: 分析 phase_4_24 的算法
+
+阅读 `<phase_4_24>` 的反汇编:
+
+**约束 1 — 输入范围** (0x4054ea ~ 0x40550e):
+```
+4054ea:  call   sscanf          # 格式 "%d"，读一个整数 x
+4054f2:  cmp    $0x1,-0x4(%rbp) # sscanf 返回值 == 1?
+4054f8:  mov    -0x34(%rbp),%eax
+4054fb:  test   %eax,%eax       # x > 0?
+4054fd:  jg     405504          # 是则跳过爆炸
+405504:  mov    -0x34(%rbp),%eax
+405507:  cmp    $0x1f3,%eax     # x > 499?
+40550c:  jg     405513          # 是则跳过爆炸
+40550e:  call   explode_bomb
+```
+→ `x > 0` 且 `x > 499`，即 **x ≥ 500**
+
+**约束 2 — 除法取商** (0x405513 ~ 0x405530):
+```
+405519:  imul   $0x10624dd3,%rdx,%rdx  # 编译器优化：乘以魔数代替除法
+405520:  shr    $0x20,%rdx
+405524:  sar    $0x5,%edx
+40552e:  sub    %ecx,%eax
+405530:  mov    %eax,-0x34(%rbp)       # quotient = x / 500
+```
+→ 这段魔数除法等价于 `quotient = x / 500`
+
+**约束 3 — 阶乘函数** (0x405538):
+```
+405538:  call   func4_2       # result = func4_2(quotient)
+```
+
+`func4_2` 的逻辑:
+```
+func4_2(n):
+  if n <= 1: return 1
+  else: return n * func4_2(n-1)
+```
+→ `func4_2(n) = n!`（阶乘）
+
+**约束 4 — 查表比较** (0x405540 ~ 0x405558):
+```
+405540:  mov    $0x7,%edi
+405545:  call   GenerateRandomNumber    # GenerateRandomNumber(7)
+40554a:  mov    rand_div,%rax           # rand_div ∈ {0..6}
+405551:  mov    -0x30(%rbp,%rax,4),%eax # table[rand_div]
+405555:  cmp    %eax,-0x8(%rbp)         # func4_2(quotient) == table[rand_div]?
+```
+
+预置的查表值（从反汇编直接读出）:
+
+| 索引 | 值 | 含义 |
+|------|------|------|
+| 0 | 0x18 = 24 | 4! |
+| 1 | 0x78 = 120 | 5! |
+| 2 | 0x2d0 = 720 | 6! |
+| 3 | 0x13b0 = 5040 | 7! |
+| 4 | 0x9d80 = 40320 | 8! |
+| 5 | 0x58980 = 362880 | 9! |
+| 6 | 0x375f00 = 3628800 | 10! |
+
+### 第三步: GDB 提取并求解
+
+**步骤 A**: 断点在 `GenerateRandomNumber(7)` 返回后 (0x40554a):
+
+```gdb
+(gdb) break *0x40554a
+(gdb) run 720028 < bomb_720028.txt
+(gdb) p *(long long*)0x408820
+$1 = 5
+```
+
+`rand_div = 5`，查表 `table[5] = 362880 = 9!`
+
+**步骤 B**: 反推输入:
+
+```
+需要: func4_2(quotient) = 9! = 362880
+即:   quotient! = 9!
+所以: quotient = 9
+又:   quotient = x / 500
+所以: x = 9 × 500 = 4500
+验证: 4500 > 499 ✓
+```
+
+**答案**: `4500`
+
+---
+
+## Phase 5: 不可能任务 — 注入 Shellcode
+
+### 前置知识: 什么是 Shellcode
+
+Shellcode 就是一段直接可被 CPU 执行的机器码（二进制字节）。正常情况下 CPU 执行的是编译器生成的代码，但 Phase 5 会**把你输入的数据当作代码来执行**——这就是"动态生成指令"的含义。
+
+### Phase 5 的总体流程
+
+```
+用户输入十六进制字符串
+        ↓
+    tohex() 转为原始字节 → buf[256]
+        ↓
+  check_buf_valid(): XOR(buf[0..255]) 必须等于 rand_div & 0xFF
+        ↓ (校验通过)
+  goto_buf_X(): 跳转到 buf 的地址，把 buf 当作代码执行
+        ↓ (shellcode 执行完毕)
+  检查 result 全局变量 == GenerateRandomNumber(0x400) 的结果
+        ↓
+  检查执行时间 ≤ 1000ms
+```
+
+### 第一步: 理解校验机制
+
+主函数在 Phase 5 前会问你要不要继续（Y/N）。选 Y 之外任何字符进入 `phase_impossible`:
+
+```gdb
+(gdb) x/s 0x406358
+"二进制炸弹之不可能任务，你的选择是继续前行（Y），或者放弃（N）："
+(gdb) x/s 0x4063b8
+"%c"   # 只读一个字符
+```
+
+输入 Y（不是 N/n）就进入 `phase_impossible`。
+
+### 第二步: 输入约束
+
+```
+4017a5:  call   strlen          # 计算输入长度
+4017aa:  cmp    $0x9,%rax       # 长度 > 9?
+4017ae:  jbe    explode         # 不大于就炸
+4017ba:  call   strlen
+4017bf:  cmp    $0x300,%rax     # 长度 <= 768?
+4017c5:  jbe    ok              # 不超过就通过
+```
+→ 输入的十六进制字符串长度必须在 **10 ~ 768** 个字符之间（即 5 ~ 384 字节）
+
+### 第三步: XOR 校验
+
+`check_buf_valid(buf, rand_div)` 的逻辑:
+
+```c
+// buf 是 tohex 转换后的 256 字节数组
+unsigned char xor_result = 0;
+for (int i = 0; i < 256; i++) {
+    xor_result ^= buf[i];  // 逐字节异或
+}
+return (xor_result == (rand_div & 0xFF));  // 必须等于 rand_div 的低 8 位
+```
+
+首先确定 `rand_div` 是多少:
+
+```gdb
+(gdb) break *0x401808    # GenerateRandomNumber(0x400) 返回后
+(gdb) run 720028 < bomb_720028.txt
+(gdb) p *(long long*)0x408820
+$1 = 540
+```
+
+`540 & 0xFF = 540 % 256 = 28 = 0x1c`
+
+所以 buf 的 256 字节 XOR 结果必须等于 `0x1c`。
+
+### 第四步: 理解 goto_buf 跳转机制
+
+`GenerateRandomNumber(3)` 决定使用哪个 goto 函数:
+
+```
+40183f:  call   GenerateRandomNumber  # GenerateRandomNumber(3)
+40184b:  cmp    $0x2,%rax             # rand_div == 2?
+40184f:  je     call_goto_buf_2
+```
+
+三个 goto 函数都在做同一件事——**跳转到 buf 执行**:
+
+| 函数 | 实现 | 效果 |
+|------|------|------|
+| `goto_buf_0` | `jmp *%rax` | 直接跳到 buf |
+| `goto_buf_1` | `push %rax; ret` | 把 buf 地址压栈再 ret（效果等同跳转） |
+| `goto_buf_2` | `mov %rax,(%rsp); ret` | 把栈顶替换为 buf 地址再 ret |
+
+`%rax` 在调用前被设为 buf 的地址。无论哪个，结果都是 CPU 开始执行 buf 中的字节。
+
+### 第五步: 构造 Shellcode
+
+Shellcode 跳到 buf 执行后，需要完成以下任务:
+
+1. 调用 `GenerateRandomNumber(0x400)` 获取一个新的 rand_div
+2. 把 rand_div 存入全局变量 `result`（地址 `0x4087f8`）
+3. 跳回主程序，**跳过 explode_bomb**，到达比较 `result == rand_div` 的代码（地址 `0x4018a0`）
+
+用汇编表示:
+
+```asm
+; 1. 调用 GenerateRandomNumber(0x400)
+mov    edi, 0x400             ; 参数 = 0x400
+movabs rax, 0x4016ad          ; GenerateRandomNumber 的地址
+call   rax                    ; 调用
+
+; 2. 把 rand_div 存入 result
+movabs rax, 0x408820          ; rand_div 的地址
+mov    rax, [rax]             ; 读取 rand_div
+movabs rcx, 0x4087f8          ; result 的地址
+mov    [rcx], eax             ; 写入 result
+
+; 3. 跳回 0x4018a0（跳过 explode_bomb）
+push   0x4018a0               ; 目标地址压栈
+ret                            ; ret 会弹出栈顶地址并跳转
+```
+
+### 第六步: 转为机器码并修正 XOR
+
+用 Python 把汇编转为机器码:
+
+```python
+import struct
+
+shellcode = b""
+
+# mov edi, 0x400
+shellcode += b"\xbf\x00\x04\x00\x00"
+
+# movabs rax, 0x4016ad  (GenerateRandomNumber)
+shellcode += b"\x48\xb8" + struct.pack("<Q", 0x4016ad)
+
+# call rax
+shellcode += b"\xff\xd0"
+
+# movabs rax, 0x408820  (rand_div)
+shellcode += b"\x48\xb8" + struct.pack("<Q", 0x408820)
+# mov rax, [rax]
+shellcode += b"\x48\x8b\x00"
+
+# movabs rcx, 0x4087f8  (result)
+shellcode += b"\x48\xb9" + struct.pack("<Q", 0x4087f8)
+# mov [rcx], eax
+shellcode += b"\x89\x01"
+
+# push 0x4018a0; ret  (跳回主程序)
+shellcode += b"\x68" + struct.pack("<I", 0x4018a0)
+shellcode += b"\xc3"
+```
+
+然后把 shellcode 放入 256 字节的 buf，调整一个空闲字节使 XOR = 0x1c:
+
+```python
+buf = bytearray(256)
+buf[:len(shellcode)] = shellcode
+
+# 计算 XOR
+xor_val = 0
+for b in buf:
+    xor_val ^= b
+
+# 在 shellcode 之后的空闲位置放一个修正字节
+target = 0x1c  # 540 & 0xFF
+buf[len(shellcode)] = xor_val ^ target
+
+# 验证
+assert sum(buf) ^ sum(buf) == 0  # 简单验证
+xor_check = 0
+for b in buf:
+    xor_check ^= b
+assert xor_check == target
+
+# 输出为十六进制字符串
+print(buf.hex())
+```
+
+最终得到的十六进制输入（512 个字符）就是 Phase 5 的答案。
+
+### 第七步: 验证
+
+```
+请输入第4级的密码：完美了~你已经通过了第4级考验！
+... 你的选择是继续前行（Y），或者放弃（N）：Y
+友情提示：后面的代码，涉及到反调试、动态生成指令、执行超时检测等...
+不可能任务，请输入突防指令：你已经通过了第5级考验，完成了不可能完成任务（终极考验）！
+温馨提示：炸弹还有隐藏彩蛋哦...
+```
+
+---
+
 ## 最终验证
 
-答案文件 `bomb_202402720028.txt` 内容（一行一个答案）:
+答案文件 `bomb_720028.txt` 内容（一行一个答案）:
 
 ```
 yxYZRkQzJt
 44 45 46 47 48 49
 133 E 106
+4500
+Y
+bf0004000048b8ad16400000000000ffd048b82088400000000000488b0048b9f887400000000000890168a0184000c34d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 ```
 
 运行:
 
 ```bash
-./bomb_linux 720028 < bomb_202402720028.txt
+./bomb_linux 720028 < bomb_720028.txt
 ```
 
 输出:
@@ -315,6 +635,9 @@ yxYZRkQzJt
 请输入第1级的密码：牛刀小试~你已经通过了第1级考验！
 请输入第2级的密码：不错不错~你已经通过了第2级考验！
 请输入第3级的密码：今夜没加班？ 你已经通过了第3级考验！
+请输入第4级的密码：完美了~你已经通过了第4级考验！
+... 你的选择是继续前行（Y），或者放弃（N）：你已经通过了第5级考验，完成了不可能完成任务（终极考验）！
+温馨提示：炸弹还有隐藏彩蛋哦...
 ```
 
 ---
@@ -329,4 +652,11 @@ yxYZRkQzJt
 4. **GDB 提取随机值** — 在 `GenerateRandomNumber` 返回后设断点，读 `rand_div` (0x408820)
 5. **代入求解** — 把随机值代入约束，算出答案
 
-> **注意**: 不同学号的随机种子不同，会产生不同的随机数序列和子关卡，你需要按上述流程跑自己的学号。
+Phase 5 的特殊之处:
+
+- 需要编写 **shellcode**（x86-64 机器码），理解调用约定和指令编码
+- 理解 **XOR 校验**：通过调整空闲字节使整个 buf 的异或值等于目标
+- 理解 **控制流劫持**：`goto_buf_X` 把 buf 地址作为跳转目标，CPU 从 buf 开始执行你的代码
+- 用 **push + ret** 实现远距离跳转（`jmp rel32` 只能跳 ±2GB，栈地址和代码段距离可能超限）
+
+> **注意**: 不同学号的随机种子不同，会产生不同的随机数序列和子关卡，你需要按上述流程跑自己的学号。Phase 5 的 shellcode 结构通用，但 XOR 校验目标值因学号而异。
