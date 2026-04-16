@@ -27,9 +27,9 @@ WHITE='\033[37m'
 
 # ── 动画速度 (秒) ──
 T_CHAR=0.018       # 打字速度: 每字符
-T_LINE=0.3        # 逐行弹出: 行间延迟
-T_BLOCK=0.6        # 区块间延迟
-T_DRAMATIC=0.6     # 重要信息前的戏剧性停顿
+T_LINE=0.2        # 逐行弹出: 行间延迟
+T_BLOCK=0.4        # 区块间延迟
+T_DRAMATIC=0.5     # 重要信息前的戏剧性停顿
 
 # ── 工具函数 ──
 
@@ -637,7 +637,7 @@ echo -ne "  ${CYAN}"
 for ((i=0; i<61; i++)); do printf "═"; done
 echo -e "${RST}"
 echo -ne "  ${BOLD}${CYAN}"
-title_t2="加分项 — 反编译 C++ 可运行版本"
+title_t2="反编译 C++ 可运行版本"
 for ((i=0; i<${#title_t2}; i++)); do
     printf "%s" "${title_t2:$i:1}"
     sleep 0.025
@@ -650,10 +650,9 @@ echo ""
 
 sleep "$T_BLOCK"
 
-pop_desc "不只是「抄答案」，而是把炸弹完整反编译成可编译的 C++ 代码。
+pop_desc "
 通过阅读反汇编，理解每一关的算法逻辑，
-用高级语言重新实现，编译后行为一致。
-这证明了对每一关逻辑的完全理解。"
+用高级语言重新实现，编译后行为一致。"
 sep
 
 if [ -f "$DECOMPILED" ] && [ -x "$DECOMPILED" ]; then
