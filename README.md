@@ -21,8 +21,8 @@ git checkout lab1    #此处lab1可更换为需要查看的分支
 
 2. 方法2：在github网页查看README文档
 
-- [实验一](https://github.com/ren-yi-NUDT/CS-lab/blob/lab1/README.md)
-- [实验二](https://github.com/ren-yi-NUDT/CS-lab/blob/lab2/README.md)
-- [实验三](https://github.com/ren-yi-NUDT/CS-lab/blob/lab3/README.md)
+- [实验一](https://github.com/ren-yi-NUDT/CS-lab/blob/lab1/README.txt "实验一readme链接")
+- [实验二](https://github.com/ren-yi-NUDT/CS-lab/blob/lab2/README.md "实验二readme链接")
+- [实验三](https://github.com/ren-yi-NUDT/CS-lab/blob/lab3/README.md "实验三readme链接")
   
    ···
