@@ -72,6 +72,6 @@ def run(file):
         if not cycle():
             break
 
-run('D:/python/test.toy')
+run('test.toy')
 
 

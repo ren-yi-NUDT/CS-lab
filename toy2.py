@@ -77,4 +77,4 @@ def run(file):
         if hasNextInstruc == False:
             break
 
-run('D:/python/test.toy2')
+run('test.toy2')

@@ -1,0 +1,1 @@
+/home/ren/Desktop/CS/lab4/y86sim/target/debug/y86sim: /home/ren/Desktop/CS/lab4/y86sim/src/cpu.rs /home/ren/Desktop/CS/lab4/y86sim/src/instruction.rs /home/ren/Desktop/CS/lab4/y86sim/src/main.rs /home/ren/Desktop/CS/lab4/y86sim/src/memory.rs
