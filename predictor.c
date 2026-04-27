@@ -7,104 +7,406 @@
 
 #include "common.h"
 
-// ±¥ºÍ¼ÆÊıÆ÷£º¼Ó1
-static inline UINT32 SatIncrement(UINT32 x, UINT32 max)
-{
-	if (x<max) return x + 1;
-	return x;
-}
-
-// ±¥ºÍ¼ÆÊıÆ÷£º¼õ1
-static inline UINT32 SatDecrement(UINT32 x)
-{
-	if (x>0) return x - 1;
-	return x;
-}
-
-// The state is defined for Gshare, change for your design
-// Gshare·ÖÖ§Ô¤²âÆ÷µÄ×´Ì¬ĞÅÏ¢£¬ÄãĞèÒª¸ù¾İ×Ô¼ºµÄÉè¼Æ½øĞĞµ÷Õû
-UINT32 ghr;             // global history register  È«¾ÖÀúÊ·¼Ä´æÆ÷
-UINT32 *pht;            // pattern history table    Ä£Ê½ÀúÊ·±í
-UINT32 historyLength;   // history length           ÀúÊ·³¤¶È
-UINT32 numPhtEntries;   // entries in pht           PHTÖĞµÄÏîÊı
-
-#define PHT_CTR_MAX  3
-#define PHT_CTR_INIT 2
-
-#define HIST_LEN   17   // È«¾ÖÀúÊ·¼Ä´æÆ÷³¤¶È£¬È¡17Î»
-
 #define TAKEN		'T'
 #define NOT_TAKEN	'N'
 
+// ==================== å®éªŒ10: local (3ä½å±€éƒ¨å†å²+10ä½PC) ====================
+
+#define BHT_BITS     10
+#define HIST_BITS    3
+#define BHT_SIZE     (1 << BHT_BITS)
+#define BHT_MASK     (BHT_SIZE - 1)
+#define HIST_MASK    ((1 << HIST_BITS) - 1)
+#define PHT_SIZE     (1 << (BHT_BITS + HIST_BITS))
+#define CTR_MAX      3
+#define CTR_INIT     2
+
+UINT32 *pht;
+UINT32 *bht;
+
+static inline UINT32 SatIncrement(UINT32 x, UINT32 max) { return x < max ? x + 1 : x; }
+static inline UINT32 SatDecrement(UINT32 x)             { return x > 0 ? x - 1 : x; }
 
 void PREDICTOR_init(void)
 {
-
-	historyLength = HIST_LEN;
-	ghr = 0;
-	numPhtEntries = (1 << HIST_LEN);    // Ä£Ê½ÀúÊ·±í£¬¾ÍÓĞ2^17Ïî
-
-	pht = (UINT32 *)malloc(numPhtEntries * sizeof(UINT32));
-
-    // ½«Ä£Ê½ÀúÊ·±í£¬È«²¿³õÊ¼»¯ÎªPHT_CTR_INIT
-	for (UINT32 ii = 0; ii< numPhtEntries; ii++) {
-		pht[ii] = PHT_CTR_INIT;
-	}
-
+	pht = (UINT32 *)malloc(PHT_SIZE * sizeof(UINT32));
+	bht = (UINT32 *)malloc(BHT_SIZE * sizeof(UINT32));
+	for (UINT32 i = 0; i < PHT_SIZE; i++)
+		pht[i] = CTR_INIT;
+	for (UINT32 i = 0; i < BHT_SIZE; i++)
+		bht[i] = 0;
 }
 
-// Gshare·ÖÖ§Ô¤²âÆ÷
-// ½«PCµÄµÍ17Î»£¬ÓëÈ«¾ÖÀúÊ·¼Ä´æÆ÷½øĞĞÒì»ò£¨¼ÓÃÜ£©£¬È¥Ë÷ÒıPHT£¬µÃµ½¶ÔÓ¦µÄ±¥ºÍ×´Ì¬
-// Èç¹û¸Ã×´Ì¬µÄÖµ³¬¹ıÒ»°ë£¬ÔòÔ¤²âÌø×ª
-// Èç¹û¸Ã×´Ì¬µÄÖµµÍÓÚÒ»°ë£¬ÔòÔ¤²â²»Ìø×ª
 char GetPrediction(UINT64 PC)
 {
-
-	UINT32 phtIndex = (PC^ghr) % (numPhtEntries);
-	UINT32 phtCounter = pht[phtIndex];
-
-	if (phtCounter > (PHT_CTR_MAX / 2)) {
-		return TAKEN;
-	}
-	else {
-		return NOT_TAKEN;
-	}
+	UINT32 bhtIndex = (PC >> 2) & BHT_MASK;
+	UINT32 hist     = bht[bhtIndex];
+	UINT32 phtIndex = (bhtIndex << HIST_BITS) | hist;
+	return pht[phtIndex] > (CTR_MAX / 2) ? TAKEN : NOT_TAKEN;
 }
 
-// Gshare·ÖÖ§Ô¤²âÆ÷
-// ¸ù¾İ·ÖÖ§Ö¸ÁîÊµ¼ÊÖ´ĞĞ½á¹û£¬À´¸üĞÂ¶ÔÓ¦µÄ±¥ºÍ¼ÆÊıÆ÷
-// Èç¹û½á¹ûÎªÌø×ª£¬Ôò¶ÔÓ¦µÄ±¥ºÍ¼ÆÊıÆ÷+1
-// Èç¹û½á¹ûÎª²»Ìø×ª£¬Ôò¶ÔÓ¦µÄ±¥ºÍ¼ÆÊıÆ÷-1
-// ¸üĞÂÈ«¾ÖÀúÊ·¼Ä´æÆ÷£º
-// ½á¹ûÎªÌø×ª£¬½«1ÒÆÎ»µ½GHRµÄ×îµÍÎ»
-// ½á¹ûÎª²»Ìø×ª£¬½«0ÒÆÎ»µ½GHRµÄ×îµÍÎ»
-void  UpdatePredictor(UINT64 PC, OpType opType, char resolveDir, char predDir, UINT64 branchTarget)
+void UpdatePredictor(UINT64 PC, OpType opType, char resolveDir, char predDir, UINT64 branchTarget)
 {
-
-    opType = opType;
-    predDir = predDir;
-    branchTarget = branchTarget;
-    
-	UINT32 phtIndex = (PC^ghr) % (numPhtEntries);
-	UINT32 phtCounter = pht[phtIndex];
-//	printf("PC=%016llx resolveDir=%c predDir=%c branchTarget=%016llx\n", PC, resolveDir, predDir, branchTarget);
-
-	if (resolveDir == TAKEN) {
-		pht[phtIndex] = SatIncrement(phtCounter, PHT_CTR_MAX);  // Èç¹û½á¹ûÎªÌø×ª£¬Ôò¶ÔÓ¦µÄ±¥ºÍ¼ÆÊıÆ÷+1
-	}
-	else {
-		pht[phtIndex] = SatDecrement(phtCounter);  // Èç¹û½á¹ûÎª²»Ìø×ª£¬Ôò¶ÔÓ¦µÄ±¥ºÍ¼ÆÊıÆ÷-1
-	}
-
-	// update the GHR
-	ghr = (ghr << 1);
-
-	if (resolveDir == TAKEN) {
-		ghr = ghr | 0x1;
-	}
+	(void)opType; (void)predDir; (void)branchTarget;
+	UINT32 bhtIndex = (PC >> 2) & BHT_MASK;
+	UINT32 hist     = bht[bhtIndex];
+	UINT32 phtIndex = (bhtIndex << HIST_BITS) | hist;
+	if (resolveDir == TAKEN)
+		pht[phtIndex] = SatIncrement(pht[phtIndex], CTR_MAX);
+	else
+		pht[phtIndex] = SatDecrement(pht[phtIndex]);
+	bht[bhtIndex] = ((bht[bhtIndex] << 1) & HIST_MASK);
+	if (resolveDir == TAKEN)
+		bht[bhtIndex] |= 1;
 }
 
 void PREDICTOR_free(void)
 {
 	free(pht);
+	free(bht);
 }
+
+// ==================== å®éªŒ9: global (10ä½å…¨å±€å†å²) ====================
+// ç»“æœå·²å†™å…¥ Result.xlsx Row 9
+
+// #define HIST_LEN     10
+// #define PHT_SIZE     (1 << HIST_LEN)
+// #define HIST_MASK    (PHT_SIZE - 1)
+// #define CTR_MAX      3
+// #define CTR_INIT     2
+
+// UINT32 ghr;
+// UINT32 *pht;
+
+// static inline UINT32 SatIncrement(UINT32 x, UINT32 max) { return x < max ? x + 1 : x; }
+// static inline UINT32 SatDecrement(UINT32 x)             { return x > 0 ? x - 1 : x; }
+
+// void PREDICTOR_init(void)
+// {
+// 	ghr = 0;
+// 	pht = (UINT32 *)malloc(PHT_SIZE * sizeof(UINT32));
+// 	for (UINT32 i = 0; i < PHT_SIZE; i++)
+// 		pht[i] = CTR_INIT;
+// }
+
+// char GetPrediction(UINT64 PC)
+// {
+// 	(void)PC;
+// 	return pht[ghr] > (CTR_MAX / 2) ? TAKEN : NOT_TAKEN;
+// }
+
+// void UpdatePredictor(UINT64 PC, OpType opType, char resolveDir, char predDir, UINT64 branchTarget)
+// {
+// 	(void)PC; (void)opType; (void)predDir; (void)branchTarget;
+// 	if (resolveDir == TAKEN)
+// 		pht[ghr] = SatIncrement(pht[ghr], CTR_MAX);
+// 	else
+// 		pht[ghr] = SatDecrement(pht[ghr]);
+// 	ghr = ((ghr << 1) & HIST_MASK);
+// 	if (resolveDir == TAKEN)
+// 		ghr |= 1;
+// }
+
+// void PREDICTOR_free(void)
+// {
+// 	free(pht);
+// }
+
+// ==================== å®éªŒ8: gshare PC<<1 ====================
+// ç»“æœå·²å†™å…¥ Result.xlsx Row 8
+
+// #define HIST_LEN     17
+// #define PHT_SIZE     (1 << HIST_LEN)
+// #define CTR_MAX      3
+// #define CTR_INIT     2
+
+// UINT32 ghr;
+// UINT32 *pht;
+
+// static inline UINT32 SatIncrement(UINT32 x, UINT32 max) { return x < max ? x + 1 : x; }
+// static inline UINT32 SatDecrement(UINT32 x)             { return x > 0 ? x - 1 : x; }
+
+// void PREDICTOR_init(void)
+// {
+// 	ghr = 0;
+// 	pht = (UINT32 *)malloc(PHT_SIZE * sizeof(UINT32));
+// 	for (UINT32 i = 0; i < PHT_SIZE; i++)
+// 		pht[i] = CTR_INIT;
+// }
+
+// char GetPrediction(UINT64 PC)
+// {
+// 	UINT32 index = ((PC << 1) ^ ghr) % PHT_SIZE;
+// 	return pht[index] > (CTR_MAX / 2) ? TAKEN : NOT_TAKEN;
+// }
+
+// void UpdatePredictor(UINT64 PC, OpType opType, char resolveDir, char predDir, UINT64 branchTarget)
+// {
+// 	(void)opType; (void)predDir; (void)branchTarget;
+// 	UINT32 index = ((PC << 1) ^ ghr) % PHT_SIZE;
+// 	if (resolveDir == TAKEN)
+// 		pht[index] = SatIncrement(pht[index], CTR_MAX);
+// 	else
+// 		pht[index] = SatDecrement(pht[index]);
+// 	ghr = (ghr << 1);
+// 	if (resolveDir == TAKEN)
+// 		ghr |= 1;
+// }
+
+// void PREDICTOR_free(void)
+// {
+// 	free(pht);
+// }
+
+// ==================== å®éªŒ7: gshare (PC XOR ghr, 17ä½å†å²) ====================
+// ç»“æœå·²å†™å…¥ Result.xlsx Row 7
+
+// #define HIST_LEN     17
+// #define PHT_SIZE     (1 << HIST_LEN)
+// #define CTR_MAX      3
+// #define CTR_INIT     2
+
+// UINT32 ghr;
+// UINT32 *pht;
+
+// static inline UINT32 SatIncrement(UINT32 x, UINT32 max) { return x < max ? x + 1 : x; }
+// static inline UINT32 SatDecrement(UINT32 x)             { return x > 0 ? x - 1 : x; }
+
+// void PREDICTOR_init(void)
+// {
+// 	ghr = 0;
+// 	pht = (UINT32 *)malloc(PHT_SIZE * sizeof(UINT32));
+// 	for (UINT32 i = 0; i < PHT_SIZE; i++)
+// 		pht[i] = CTR_INIT;
+// }
+
+// char GetPrediction(UINT64 PC)
+// {
+// 	UINT32 index = (PC ^ ghr) % PHT_SIZE;
+// 	return pht[index] > (CTR_MAX / 2) ? TAKEN : NOT_TAKEN;
+// }
+
+// void UpdatePredictor(UINT64 PC, OpType opType, char resolveDir, char predDir, UINT64 branchTarget)
+// {
+// 	(void)opType; (void)predDir; (void)branchTarget;
+// 	UINT32 index = (PC ^ ghr) % PHT_SIZE;
+// 	if (resolveDir == TAKEN)
+// 		pht[index] = SatIncrement(pht[index], CTR_MAX);
+// 	else
+// 		pht[index] = SatDecrement(pht[index]);
+// 	ghr = (ghr << 1);
+// 	if (resolveDir == TAKEN)
+// 		ghr |= 1;
+// }
+
+// void PREDICTOR_free(void)
+// {
+// 	free(pht);
+// }
+
+// ==================== å®éªŒ6: gshare PC>>1 ====================
+// ç»“æœå·²å†™å…¥ Result.xlsx Row 6
+
+// #define HIST_LEN     17
+// #define PHT_SIZE     (1 << HIST_LEN)
+// #define CTR_MAX      3
+// #define CTR_INIT     2
+
+// UINT32 ghr;
+// UINT32 *pht;
+
+// static inline UINT32 SatIncrement(UINT32 x, UINT32 max) { return x < max ? x + 1 : x; }
+// static inline UINT32 SatDecrement(UINT32 x)             { return x > 0 ? x - 1 : x; }
+
+// void PREDICTOR_init(void)
+// {
+// 	ghr = 0;
+// 	pht = (UINT32 *)malloc(PHT_SIZE * sizeof(UINT32));
+// 	for (UINT32 i = 0; i < PHT_SIZE; i++)
+// 		pht[i] = CTR_INIT;
+// }
+
+// char GetPrediction(UINT64 PC)
+// {
+// 	UINT32 index = ((PC >> 1) ^ ghr) % PHT_SIZE;
+// 	return pht[index] > (CTR_MAX / 2) ? TAKEN : NOT_TAKEN;
+// }
+
+// void UpdatePredictor(UINT64 PC, OpType opType, char resolveDir, char predDir, UINT64 branchTarget)
+// {
+// 	(void)opType; (void)predDir; (void)branchTarget;
+// 	UINT32 index = ((PC >> 1) ^ ghr) % PHT_SIZE;
+// 	if (resolveDir == TAKEN)
+// 		pht[index] = SatIncrement(pht[index], CTR_MAX);
+// 	else
+// 		pht[index] = SatDecrement(pht[index]);
+// 	ghr = (ghr << 1);
+// 	if (resolveDir == TAKEN)
+// 		ghr |= 1;
+// }
+
+// void PREDICTOR_free(void)
+// {
+// 	free(pht);
+// }
+
+// ==================== å®éªŒ5: gshare PC>>2 ====================
+// ç»“æœå·²å†™å…¥ Result.xlsx Row 5
+
+// #define HIST_LEN     17
+// #define PHT_SIZE     (1 << HIST_LEN)
+// #define CTR_MAX      3
+// #define CTR_INIT     2
+
+// UINT32 ghr;
+// UINT32 *pht;
+
+// static inline UINT32 SatIncrement(UINT32 x, UINT32 max) { return x < max ? x + 1 : x; }
+// static inline UINT32 SatDecrement(UINT32 x)             { return x > 0 ? x - 1 : x; }
+
+// void PREDICTOR_init(void)
+// {
+// 	ghr = 0;
+// 	pht = (UINT32 *)malloc(PHT_SIZE * sizeof(UINT32));
+// 	for (UINT32 i = 0; i < PHT_SIZE; i++)
+// 		pht[i] = CTR_INIT;
+// }
+
+// char GetPrediction(UINT64 PC)
+// {
+// 	UINT32 index = ((PC >> 2) ^ ghr) % PHT_SIZE;
+// 	return pht[index] > (CTR_MAX / 2) ? TAKEN : NOT_TAKEN;
+// }
+
+// void UpdatePredictor(UINT64 PC, OpType opType, char resolveDir, char predDir, UINT64 branchTarget)
+// {
+// 	(void)opType; (void)predDir; (void)branchTarget;
+// 	UINT32 index = ((PC >> 2) ^ ghr) % PHT_SIZE;
+// 	if (resolveDir == TAKEN)
+// 		pht[index] = SatIncrement(pht[index], CTR_MAX);
+// 	else
+// 		pht[index] = SatDecrement(pht[index]);
+// 	ghr = (ghr << 1);
+// 	if (resolveDir == TAKEN)
+// 		ghr |= 1;
+// }
+
+// void PREDICTOR_free(void)
+// {
+// 	free(pht);
+// }
+
+// ==================== å®éªŒ4: local PC>>2 ====================
+// ç»“æœå·²å†™å…¥ Result.xlsx Row 4
+
+// #define BHT_SIZE  (1 << 17)
+// #define HIST_LEN  10
+// #define PHT_SIZE  (1 << HIST_LEN)
+// #define HIST_MASK (PHT_SIZE - 1)
+// #define CTR_MAX   3
+// #define CTR_INIT  2
+
+// UINT32 *pht;
+// UINT32 *bht;
+
+// static inline UINT32 SatIncrement(UINT32 x, UINT32 max) { return x < max ? x + 1 : x; }
+// static inline UINT32 SatDecrement(UINT32 x)             { return x > 0 ? x - 1 : x; }
+
+// void PREDICTOR_init(void)
+// {
+// 	pht = (UINT32 *)malloc(PHT_SIZE * sizeof(UINT32));
+// 	bht = (UINT32 *)malloc(BHT_SIZE * sizeof(UINT32));
+// 	for (UINT32 i = 0; i < PHT_SIZE; i++)
+// 		pht[i] = CTR_INIT;
+// 	for (UINT32 i = 0; i < BHT_SIZE; i++)
+// 		bht[i] = 0;
+// }
+
+// char GetPrediction(UINT64 PC)
+// {
+// 	UINT32 bhtIndex  = (PC >> 2) % BHT_SIZE;
+// 	UINT32 phtIndex  = bht[bhtIndex];
+// 	return pht[phtIndex] > (CTR_MAX / 2) ? TAKEN : NOT_TAKEN;
+// }
+
+// void UpdatePredictor(UINT64 PC, OpType opType, char resolveDir, char predDir, UINT64 branchTarget)
+// {
+// 	(void)opType; (void)predDir; (void)branchTarget;
+// 	UINT32 bhtIndex  = (PC >> 2) % BHT_SIZE;
+// 	UINT32 phtIndex  = bht[bhtIndex];
+// 	if (resolveDir == TAKEN)
+// 		pht[phtIndex] = SatIncrement(pht[phtIndex], CTR_MAX);
+// 	else
+// 		pht[phtIndex] = SatDecrement(pht[phtIndex]);
+// 	bht[bhtIndex] = ((bht[bhtIndex] << 1) & HIST_MASK);
+// 	if (resolveDir == TAKEN)
+// 		bht[bhtIndex] |= 1;
+// }
+
+// void PREDICTOR_free(void)
+// {
+// 	free(pht);
+// 	free(bht);
+// }
+
+// ==================== å®éªŒ3: 2bits PC>>2 ====================
+// ç»“æœå·²å†™å…¥ Result.xlsx Row 3
+
+// #define TABLE_SIZE (1 << 17)
+// #define CTR_MAX   3
+// #define CTR_INIT  2
+
+// UINT32 *pht;
+
+// static inline UINT32 SatIncrement(UINT32 x, UINT32 max) { return x < max ? x + 1 : x; }
+// static inline UINT32 SatDecrement(UINT32 x)             { return x > 0 ? x - 1 : x; }
+
+// void PREDICTOR_init(void)
+// {
+// 	pht = (UINT32 *)malloc(TABLE_SIZE * sizeof(UINT32));
+// 	for (UINT32 i = 0; i < TABLE_SIZE; i++)
+// 		pht[i] = CTR_INIT;
+// }
+
+// char GetPrediction(UINT64 PC)
+// {
+// 	UINT32 index = (PC >> 2) % TABLE_SIZE;
+// 	return pht[index] > (CTR_MAX / 2) ? TAKEN : NOT_TAKEN;
+// }
+
+// void UpdatePredictor(UINT64 PC, OpType opType, char resolveDir, char predDir, UINT64 branchTarget)
+// {
+// 	(void)opType; (void)predDir; (void)branchTarget;
+// 	UINT32 index = (PC >> 2) % TABLE_SIZE;
+// 	if (resolveDir == TAKEN)
+// 		pht[index] = SatIncrement(pht[index], CTR_MAX);
+// 	else
+// 		pht[index] = SatDecrement(pht[index]);
+// }
+
+// void PREDICTOR_free(void)
+// {
+// 	free(pht);
+// }
+
+// ==================== å®éªŒ2: static (æ€»æ˜¯é¢„æµ‹Taken) ====================
+// ç»“æœå·²å†™å…¥ Result.xlsx Row 2
+
+// void PREDICTOR_init(void)
+// {
+// }
+
+// char GetPrediction(UINT64 PC)
+// {
+// 	(void)PC;
+// 	return TAKEN;
+// }
+
+// void  UpdatePredictor(UINT64 PC, OpType opType, char resolveDir, char predDir, UINT64 branchTarget)
+// {
+// 	(void)PC; (void)opType; (void)resolveDir; (void)predDir; (void)branchTarget;
+// }
+
+// void PREDICTOR_free(void)
+// {
+// }

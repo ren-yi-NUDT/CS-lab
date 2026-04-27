@@ -75,7 +75,22 @@ main() {
         echo ""
     done
 
-    echo "========== Summary =========="
+    echo "========== MISPRED_PER_1K_INST =========="
+    printf "%-25s %s\n" "Trace" "Mispred/1K"
+    printf "%-25s %s\n" "-------------------------" "----------"
+    for t in "${traces[@]}"; do
+        local name
+        name=$(basename "$t" .bt9.trace.gz)
+        local log="$LOG_DIR/${name}.log"
+        if [ -f "$log" ]; then
+            local val
+            val=$(grep 'MISPRED_PER_1K_INST' "$log" | awk '{print $NF}')
+            printf "%-25s %s\n" "$name" "$val"
+        else
+            printf "%-25s %s\n" "$name" "N/A"
+        fi
+    done
+    echo ""
     echo "Total: $total  OK: $ok  Failed: $fail"
     echo "Time:  ${SECONDS}s"
     echo "Logs in $LOG_DIR/"
