@@ -12,59 +12,59 @@
 
 // ==================== 实验10: local (3位局部历史+10位PC) ====================
 
-#define BHT_BITS     10
-#define HIST_BITS    3
-#define BHT_SIZE     (1 << BHT_BITS)
-#define BHT_MASK     (BHT_SIZE - 1)
-#define HIST_MASK    ((1 << HIST_BITS) - 1)
-#define PHT_SIZE     (1 << (BHT_BITS + HIST_BITS))
-#define CTR_MAX      3
-#define CTR_INIT     2
+// #define BHT_BITS     10
+// #define HIST_BITS    3
+// #define BHT_SIZE     (1 << BHT_BITS)
+// #define BHT_MASK     (BHT_SIZE - 1)
+// #define HIST_MASK    ((1 << HIST_BITS) - 1)
+// #define PHT_SIZE     (1 << (BHT_BITS + HIST_BITS))
+// #define CTR_MAX      3
+// #define CTR_INIT     2
 
-UINT32 *pht;
-UINT32 *bht;
+// UINT32 *pht;
+// UINT32 *bht;
 
-static inline UINT32 SatIncrement(UINT32 x, UINT32 max) { return x < max ? x + 1 : x; }
-static inline UINT32 SatDecrement(UINT32 x)             { return x > 0 ? x - 1 : x; }
+// static inline UINT32 SatIncrement(UINT32 x, UINT32 max) { return x < max ? x + 1 : x; }
+// static inline UINT32 SatDecrement(UINT32 x)             { return x > 0 ? x - 1 : x; }
 
-void PREDICTOR_init(void)
-{
-	pht = (UINT32 *)malloc(PHT_SIZE * sizeof(UINT32));
-	bht = (UINT32 *)malloc(BHT_SIZE * sizeof(UINT32));
-	for (UINT32 i = 0; i < PHT_SIZE; i++)
-		pht[i] = CTR_INIT;
-	for (UINT32 i = 0; i < BHT_SIZE; i++)
-		bht[i] = 0;
-}
+// void PREDICTOR_init(void)
+// {
+// 	pht = (UINT32 *)malloc(PHT_SIZE * sizeof(UINT32));
+// 	bht = (UINT32 *)malloc(BHT_SIZE * sizeof(UINT32));
+// 	for (UINT32 i = 0; i < PHT_SIZE; i++)
+// 		pht[i] = CTR_INIT;
+// 	for (UINT32 i = 0; i < BHT_SIZE; i++)
+// 		bht[i] = 0;
+// }
 
-char GetPrediction(UINT64 PC)
-{
-	UINT32 bhtIndex = (PC >> 2) & BHT_MASK;
-	UINT32 hist     = bht[bhtIndex];
-	UINT32 phtIndex = (bhtIndex << HIST_BITS) | hist;
-	return pht[phtIndex] > (CTR_MAX / 2) ? TAKEN : NOT_TAKEN;
-}
+// char GetPrediction(UINT64 PC)
+// {
+// 	UINT32 bhtIndex = (PC >> 2) & BHT_MASK;
+// 	UINT32 hist     = bht[bhtIndex];
+// 	UINT32 phtIndex = (bhtIndex << HIST_BITS) | hist;
+// 	return pht[phtIndex] > (CTR_MAX / 2) ? TAKEN : NOT_TAKEN;
+// }
 
-void UpdatePredictor(UINT64 PC, OpType opType, char resolveDir, char predDir, UINT64 branchTarget)
-{
-	(void)opType; (void)predDir; (void)branchTarget;
-	UINT32 bhtIndex = (PC >> 2) & BHT_MASK;
-	UINT32 hist     = bht[bhtIndex];
-	UINT32 phtIndex = (bhtIndex << HIST_BITS) | hist;
-	if (resolveDir == TAKEN)
-		pht[phtIndex] = SatIncrement(pht[phtIndex], CTR_MAX);
-	else
-		pht[phtIndex] = SatDecrement(pht[phtIndex]);
-	bht[bhtIndex] = ((bht[bhtIndex] << 1) & HIST_MASK);
-	if (resolveDir == TAKEN)
-		bht[bhtIndex] |= 1;
-}
+// void UpdatePredictor(UINT64 PC, OpType opType, char resolveDir, char predDir, UINT64 branchTarget)
+// {
+// 	(void)opType; (void)predDir; (void)branchTarget;
+// 	UINT32 bhtIndex = (PC >> 2) & BHT_MASK;
+// 	UINT32 hist     = bht[bhtIndex];
+// 	UINT32 phtIndex = (bhtIndex << HIST_BITS) | hist;
+// 	if (resolveDir == TAKEN)
+// 		pht[phtIndex] = SatIncrement(pht[phtIndex], CTR_MAX);
+// 	else
+// 		pht[phtIndex] = SatDecrement(pht[phtIndex]);
+// 	bht[bhtIndex] = ((bht[bhtIndex] << 1) & HIST_MASK);
+// 	if (resolveDir == TAKEN)
+// 		bht[bhtIndex] |= 1;
+// }
 
-void PREDICTOR_free(void)
-{
-	free(pht);
-	free(bht);
-}
+// void PREDICTOR_free(void)
+// {
+// 	free(pht);
+// 	free(bht);
+// }
 
 // ==================== 实验9: global (10位全局历史) ====================
 // 结果已写入 Result.xlsx Row 9
