@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# --- config ---
+JOBS="${JOBS:-$(nproc)}"
+TRACE_DIR="traces"
+BINARY="./predictor"
+LOG_DIR="logs"
+# --------------
+
+build() {
+    echo "[*] make clean ..."
+    make clean 2>/dev/null || true
+    echo "[*] Building predictor ..."
+    make -j"$(nproc)"
+    if [ ! -x "$BINARY" ]; then
+        echo "[!] Build failed: $BINARY not found" >&2
+        exit 1
+    fi
+    echo "[+] Build succeeded."
+    echo ""
+}
+
+run_one() {
+    local trace="$1"
+    local name
+    name=$(basename "$trace" .bt9.trace.gz)
+    local log="$LOG_DIR/${name}.log"
+
+    "$BINARY" "$trace" > "$log" 2>&1
+}
+
+main() {
+    mkdir -p "$LOG_DIR"
+    build
+
+    local traces=()
+    for t in "$TRACE_DIR"/*.bt9.trace.gz; do
+        [ -f "$t" ] && traces+=("$t")
+    done
+
+    if [ ${#traces[@]} -eq 0 ]; then
+        echo "[!] No trace files found in $TRACE_DIR/" >&2
+        exit 1
+    fi
+
+    echo "[*] Running ${#traces[@]} traces with up to $JOBS parallel jobs ..."
+    SECONDS=0
+
+    export -f run_one
+    export BINARY LOG_DIR
+
+    printf '%s\n' "${traces[@]}" | xargs -P "$JOBS" -I{} bash -c 'run_one "$@"' _ {}
+
+    echo ""
+    echo "========== All Outputs =========="
+    echo ""
+
+    local total=0 ok=0 fail=0
+    for t in "${traces[@]}"; do
+        local name
+        name=$(basename "$t" .bt9.trace.gz)
+        local log="$LOG_DIR/${name}.log"
+        total=$((total + 1))
+
+        echo "-------- $name --------"
+        if [ -f "$log" ]; then
+            cat "$log"
+            echo ""
+            ok=$((ok + 1))
+        else
+            echo "  [!] Log file not found"
+            fail=$((fail + 1))
+        fi
+        echo ""
+    done
+
+    echo "========== Summary =========="
+    echo "Total: $total  OK: $ok  Failed: $fail"
+    echo "Time:  ${SECONDS}s"
+    echo "Logs in $LOG_DIR/"
+}
+
+main "$@"
