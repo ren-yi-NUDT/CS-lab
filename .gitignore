@@ -1,2 +1,3 @@
-logs/
-logs_perceptron
+logs*/
+predictor
+predictor_*
