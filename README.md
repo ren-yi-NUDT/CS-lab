@@ -9,7 +9,7 @@
 | 实验二-二进制炸弹 | 已更新完毕 | lab2 |
 | 实验三-缓冲区炸弹 | 已更新完毕 | lab3 |
 | 实验四-Y86-64指令模拟器 | 已更新完毕 | lab4 |
-| 实验五-分支预测器 | 更新中 | lab5 |
+| 实验五-分支预测器 | 已更新完毕 | lab5 |
 ···
 ···
 
@@ -27,5 +27,7 @@ git checkout lab1    #此处lab1可更换为需要查看的分支
 - [实验二](https://github.com/ren-yi-NUDT/CS-lab/blob/lab2/README.md "实验二readme链接")
 - [实验三](https://github.com/ren-yi-NUDT/CS-lab/blob/lab3/README.md "实验三readme链接")
 - [实验四](https://github.com/ren-yi-NUDT/CS-lab/blob/lab4/README.md "实验四readme链接")
+- [实验五](https://github.com/ren-yi-NUDT/CS-lab/blob/lab5/README.md "实验五readme链接")
+  
   
    ···
