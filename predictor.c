@@ -10,6 +10,80 @@
 #define TAKEN		'T'
 #define NOT_TAKEN	'N'
 
+// ==================== 实验11: 1-bit predictor (目标1) ====================
+// 结果已写入 Result.xlsx Row 14
+
+// #define TABLE_SIZE_1BIT (1 << 17)
+// #define TABLE_MASK_1BIT (TABLE_SIZE_1BIT - 1)
+
+// UINT32 *table_1bit;
+
+// void PREDICTOR_init(void)
+// {
+// 	table_1bit = (UINT32 *)malloc(TABLE_SIZE_1BIT * sizeof(UINT32));
+// 	for (UINT32 i = 0; i < TABLE_SIZE_1BIT; i++)
+// 		table_1bit[i] = 1;
+// }
+
+// char GetPrediction(UINT64 PC)
+// {
+// 	UINT32 index = (PC >> 2) & TABLE_MASK_1BIT;
+// 	return table_1bit[index] ? TAKEN : NOT_TAKEN;
+// }
+
+// void UpdatePredictor(UINT64 PC, OpType opType, char resolveDir, char predDir, UINT64 branchTarget)
+// {
+// 	(void)opType; (void)predDir; (void)branchTarget;
+// 	UINT32 index = (PC >> 2) & TABLE_MASK_1BIT;
+// 	table_1bit[index] = (resolveDir == TAKEN) ? 1 : 0;
+// }
+
+// void PREDICTOR_free(void)
+// {
+// 	free(table_1bit);
+// }
+
+// ==================== 实验12: 3-bit saturating counter (目标4) ====================
+// 结果已写入 Result.xlsx Row 15
+
+// #define TABLE_SIZE_3BIT (1 << 17)
+// #define TABLE_MASK_3BIT (TABLE_SIZE_3BIT - 1)
+// #define CTR_MAX_3BIT   7
+// #define CTR_INIT_3BIT  4
+
+// UINT32 *table_3bit;
+
+// static inline UINT32 SatInc3(UINT32 x, UINT32 max) { return x < max ? x + 1 : x; }
+// static inline UINT32 SatDec3(UINT32 x)             { return x > 0 ? x - 1 : x; }
+
+// void PREDICTOR_init(void)
+// {
+// 	table_3bit = (UINT32 *)malloc(TABLE_SIZE_3BIT * sizeof(UINT32));
+// 	for (UINT32 i = 0; i < TABLE_SIZE_3BIT; i++)
+// 		table_3bit[i] = CTR_INIT_3BIT;
+// }
+
+// char GetPrediction(UINT64 PC)
+// {
+// 	UINT32 index = (PC >> 2) & TABLE_MASK_3BIT;
+// 	return table_3bit[index] > (CTR_MAX_3BIT / 2) ? TAKEN : NOT_TAKEN;
+// }
+
+// void UpdatePredictor(UINT64 PC, OpType opType, char resolveDir, char predDir, UINT64 branchTarget)
+// {
+// 	(void)opType; (void)predDir; (void)branchTarget;
+// 	UINT32 index = (PC >> 2) & TABLE_MASK_3BIT;
+// 	if (resolveDir == TAKEN)
+// 		table_3bit[index] = SatInc3(table_3bit[index], CTR_MAX_3BIT);
+// 	else
+// 		table_3bit[index] = SatDec3(table_3bit[index]);
+// }
+
+// void PREDICTOR_free(void)
+// {
+// 	free(table_3bit);
+// }
+
 // ==================== 实验10: local (3位局部历史+10位PC) ====================
 
 // #define BHT_BITS     10
