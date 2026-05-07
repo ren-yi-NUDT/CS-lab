@@ -1,14 +1,14 @@
 /**************************************************************************
-	¶àÏîÊ½¼ÆËãº¯Êı¡£°´ÏÂÃæµÄÒªÇó±à¼­´ËÎÄ¼ş£º
-	1. ½«ÄãµÄÑ§ºÅ¡¢ĞÕÃû£¬ÒÔ×¢ÊÍµÄ·½Ê½Ğ´µ½ÏÂÃæ£»
-	2. ÊµÏÖ²»Í¬°æ±¾µÄ¶àÏîÊ½¼ÆËãº¯Êı£»
-	3. ±à¼­peval_fun_rec peval_fun_tabÊı×é£¬½«ÄãµÄ×îºÃµÄ´ğ°¸
-		£¨×îĞ¡CPE¡¢×îĞ¡C10£©×÷ÎªÊı×éµÄÇ°Á½Ïî
+	å¤šé¡¹å¼è®¡ç®—å‡½æ•°ï¼Œåªéœ€è¦ç¼–è¾‘æœ¬æ–‡ä»¶
+	1. å°†å­¦å·ã€å§“åä»¥æ³¨é‡Šçš„æ–¹å¼å†™åœ¨è¿™é‡Œï¼›
+	2. å®ç°ä¸åŒç‰ˆæœ¬çš„å¤šé¡¹å¼è®¡ç®—å‡½æ•°
+	3. ç¼–è¾‘peval_fun_rec peval_fun_tabæ•°ç»„ï¼Œå°†ä½ å†™çš„ä»£ç 
+		æœ€å°CPEã€æœ€å°C10æ”¾åœ¨å‰é¢
 ***************************************************************************/
-   
+
 /*
-	Ñ§ºÅ£º201209054233
-	ĞÕÃû£ºÒ¹°ë¼Ó°à¿ñ
+	å­¦å·ï¼š202402720028
+	å§“åï¼šä»»å¥•
 */
 
 
@@ -23,103 +23,83 @@ typedef struct {
 } peval_fun_rec, *peval_fun_ptr;
 
 
-/**************************************************************************
- Edit this comment to indicate your name and Andrew ID
-#ifdef ASSIGN
-   Submission by Harry Q. Bovik, bovik@andrew.cmu.edu
-#else
-   Instructor's version.
-   Created by Randal E. Bryant, Randy.Bryant@cs.cmu.edu, 10/07/02
-#endif
-***************************************************************************/
-
-/*
-	ÊµÏÖÒ»¸öÖ¸¶¨µÄ³£ÏµÊı¶àÏîÊ½¼ÆËã
-	µÚÒ»´Î£¬ÇëÖ±½ÓÔËĞĞ³ÌĞò£¬ÒÔ±ã»ñÖªÄãĞèÒªÊµÏÖµÄ³£ÏµÊıÊÇÉ¶
-*/
-int const_poly_eval(int *not_use, int not_use2, int x)
+/* å¸¸ç³»æ•°å¤šé¡¹å¼ï¼šå®Œå…¨å±•å¼€çš„ Horner æ³•ï¼Œdegree=3 */
+int const_poly_eval(int *a, int degree, int x)
 {
-    int result = 0;
-/*    int i;
-    int xpwr = 1; // xµÄÃİ´Î
-    int a[4] = {21,90,42,88};
-    for (i = 0; i <= 3; i++) {
-	result += a[i]*xpwr;
-	xpwr   *= x;
+    return a[0] + x * (a[1] + x * (a[2] + x * a[3]));
+}
+
+/* CPE ä¼˜åŒ–ç‰ˆï¼š4x4a â€” 4è·¯ç‹¬ç«‹ç´¯åŠ å™¨ + Horner(x^4) äº§ç”ŸæŒ‡ä»¤çº§å¹¶è¡Œ */
+int poly_eval_cpe(int *a, int degree, int x)
+{
+    int i;
+    int x2 = x * x;
+    int x4 = x2 * x2;
+    int acc0 = 0, acc1 = 0, acc2 = 0, acc3 = 0;
+
+    for (i = degree; i >= 3; i -= 4) {
+	acc3 = acc3 * x4 + a[i];
+	acc2 = acc2 * x4 + a[i - 1];
+	acc1 = acc1 * x4 + a[i - 2];
+	acc0 = acc0 * x4 + a[i - 3];
     }
-*/
-// 90 = 64 + 32 - 4 - 2
-// 42 = 32 + 8 + 2
-// 88 = 64 + 16 + 8
-	int x64,x32,x16,x8,x4,x2;
-	
-	x64 = x << 6;
-	x32 = x << 5;
-	x16 = x << 4;
-	x8 = x << 3;
-	x4 = x << 2;
-	x2 = x << 1;
-	result = 21 + x64+x32-x4-x2 + ((x32+x8+x2) + (x64+x16+x8)*x)*x;
+
+    /* ç»„åˆ4è·¯ç´¯åŠ å™¨: acc0 + acc1*x + acc2*x^2 + acc3*x^3 */
+    int result = acc3;
+    result = result * x + acc2;
+    result = result * x + acc1;
+    result = result * x + acc0;
+
+    /* æŠ˜å å‰©ä½™ä½é˜¶é¡¹ */
+    while (i >= 0) {
+	result = result * x + a[i];
+	i--;
+    }
+
     return result;
 }
 
+/* C(10) ä¼˜åŒ–ç‰ˆï¼šHorner æ³• + 4x1a å¾ªç¯å±•å¼€ */
+int poly_eval_c10(int *a, int degree, int x)
+{
+    int i;
+    int result = a[degree];
 
+    for (i = degree - 1; i >= 3; i -= 4) {
+	result = result * x + a[i];
+	result = result * x + a[i - 1];
+	result = result * x + a[i - 2];
+	result = result * x + a[i - 3];
+    }
 
-/* ¶àÏîÊ½¼ÆËãº¯Êı¡£×¢Òâ£ºÕâ¸öÖ»ÊÇÒ»¸ö²Î¿¼ÊµÏÖ£¬ÄãĞèÒªÊµÏÖ×Ô¼ºµÄ°æ±¾ */
+    for (; i >= 0; i--) {
+	result = result * x + a[i];
+    }
 
-/*
-	ÓÑÇéÌáÊ¾£ºlccÖ§³ÖATT¸ñÊ½µÄÇ¶ÈëÊ½»ã±à£¬ÀıÈç
-	
-	_asm("movl %eax,%ebx");
-	_asm("pushl %edx");
-	
-	¿ÉÒÔÔÚlccÖĞproject->configuration->Compiler->Code Generation->Generate .asm£¬
-	½«ÆäÑ¡ÖĞºó£¬¿ÉÒÔÔÚlccÄ¿Â¼ÏÂÃæÉú³É¶ÔÓ¦³ÌĞòµÄ»ã±à´úÂëÊµÏÖ¡£Í¨¹ı²é¿´»ã±àÎÄ¼ş£¬
-	Äã¿ÉÒÔÁË½â±àÒëÆ÷ÊÇÈçºÎÊµÏÖÄãµÄ´úÂëµÄ¡£ÓĞĞ©ÊµÏÖ¿ÉÄÜ·Ç³£µÍĞ§¡£
-	Äã¿ÉÒÔÔÚÊÊµ±µÄµØ·½¼ÓÈëÇ¶ÈëÊ½»ã±à£¬À´´ó·ù¶ÈÌá¸ß¼ÆËãĞÔÄÜ¡£
-*/
+    return result;
+}
 
+/* å‚è€ƒå®ç° */
 int poly_eval(int *a, int degree, int x)
 {
-    int result = 0;
+    int result = a[degree];
     int i;
-    int xpwr = 1; /* xµÄÃİ´Î */
-//    printf("½×=%d\n",degree);
-    for (i = 0; i <= degree; i++) {
-	result += a[i]*xpwr;
-	xpwr   *= x;
+    for (i = degree - 1; i >= 0; i--) {
+	result = result * x + a[i];
     }
     return result;
 }
 
 
-
-
-/*
-	Õâ¸ö±í¸ñ°üº¬¶à¸öÊı×éÔªËØ£¬Ã¿Ò»×éÔªËØ£¨º¯ÊıÃû×Ö, "ÃèÊö×Ö·û´®"£©
-	½«ÄãÈÏÎª×îºÃµÄÁ½¸öÊµÏÖ£¬·ÅÔÚ×îÇ°Ãæ¡£
-	±ÈÈç£º
-	{my_poly_eval1, "³¬¼¶À¬»øÊµÏÖ"},
-	{my_poly_eval2, "ºÃÒ»µãµÄÊµÏÖ"},
-*/
-   
-peval_fun_rec peval_fun_tab[] = 
+peval_fun_rec peval_fun_tab[] =
 {
+  /* ç¬¬ä¸€é¡¹ï¼Œåº”è¯¥æ”¾ä½ å†™çš„ç”¨äºæœ€å°CPEçš„å‡½æ•°å®ç° */
+ {poly_eval_cpe, "CPE"},
+  /* ç¬¬äºŒé¡¹ï¼Œåº”è¯¥æ”¾ä½ å†™çš„ç”¨äºæœ€å°10é˜¶æ—¶æ‰§è¡Œæ—¶é—´æ€§èƒ½çš„å®ç° */
+ {poly_eval_c10, "C(10)"},
 
-  /* µÚÒ»Ïî£¬Ó¦µ±ÊÇÄãĞ´µÄ×îºÃCPEµÄº¯ÊıÊµÏÖ */
- {poly_eval, "Ò¹°ë¼Ó°à¿ñµÄCPE"},
-  /* µÚ¶şÏî£¬Ó¦µ±ÊÇÄãĞ´µÄÔÚ10½×Ê±¾ßÓĞ×îºÃĞÔÄÜµÄÊµÏÖ */
- {poly_eval, "Ò¹°ë¼Ó°à¿ñµÄ10½×ÊµÏÖ"},
+ {poly_eval, "poly_eval"},
 
- {poly_eval, "poly_eval: ²Î¿¼ÊµÏÖ"},
-
- /* ÏÂÃæµÄ´úÂë²»ÄÜĞŞ¸Ä»òÕßÉ¾³ı£¡£¡±íÃ÷Êı×éÁĞ±í½áÊø */
+ /* åé¢çš„ä»£ç ä¸è¦ä¿®æ”¹æˆ–åˆ é™¤ï¼Œç”¨äºç»“æŸåˆ—è¡¨ */
  {NULL, ""}
 };
-
-
-
-
-
-
-

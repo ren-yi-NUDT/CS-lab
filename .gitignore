@@ -1,0 +1,22 @@
+# Object files
+*.o
+*.obj
+
+# Executables
+*.exe
+*.out
+
+# Build artifacts
+*.d
+*.a
+*.so
+*.dylib
+
+# Misc build leftovers
+nul
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
