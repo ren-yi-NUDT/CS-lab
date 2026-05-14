@@ -323,13 +323,10 @@ struct Node {
 **环境要求**：Rust 工具链（rustc 1.56+，cargo），`input.txt` 数据文件
 
 ```bash
-# 编译
-cd microgpt-rs
-cargo build --release
-
-# 运行（需在 input.txt 所在目录）
-cd ../microgpt
-../microgpt-rs/target/release/microgpt-rs
+  ./run.sh          # 交互菜单，选择 Python / Rust / 对比测试
+  ./run.sh python   # 直接运行 Python 版
+  ./run.sh rust     # 直接运行 Rust 版
+  ./run.sh bench    # 同时跑两个，对比耗时
 ```
 
 输出示例：

@@ -1,110 +1,267 @@
-// Rust port of Karpathy's microgpt.py — arena-based autograd
-// Single-threaded optimized version with fused dot product
+// Rust port of Karpathy's microgpt — optimized arena autograd
+// Key optimizations: fused dot/sum ops reduce graph nodes ~10x, SoA layout, unsafe backward
 
 use rand::prelude::*;
 use rand_distr::Normal;
 use std::io::Write;
 use std::time::Instant;
 
-// --- Hyperparameters ---
 const N_LAYER: usize = 1;
 const N_EMBD: usize = 16;
 const BLOCK_SIZE: usize = 16;
 const N_HEAD: usize = 4;
 const HEAD_DIM: usize = N_EMBD / N_HEAD;
-const NONE: usize = usize::MAX;
 
-// --- Arena (fixed-size children, no heap alloc per node) ---
-
-#[derive(Clone)]
-struct Node {
-    data: f64,
-    grad: f64,
-    child0: usize,
-    child1: usize,
-    lg0: f64,
-    lg1: f64,
+// --- Fused operations (local grads recomputed from data during backward) ---
+enum Op {
+    Leaf,
+    Add(usize, usize),
+    Mul(usize, usize),
+    Pow(usize, f64),
+    Log(usize),
+    Exp(usize),
+    Relu(usize),
+    Smul(usize, f64),
+    Dot(usize, usize), // (start, count) in dot_pairs
+    Sum(usize, usize), // (start, count) in sum_idx
 }
 
-struct Arena { nodes: Vec<Node> }
+struct Arena {
+    data: Vec<f64>,
+    grad: Vec<f64>,
+    ops: Vec<Op>,
+    dot_pairs: Vec<(usize, usize)>,
+    sum_idx: Vec<usize>,
+}
 
 impl Arena {
-    fn with_capacity(n: usize) -> Self { Self { nodes: Vec::with_capacity(n) } }
+    fn with_capacity(n: usize) -> Self {
+        Self {
+            data: Vec::with_capacity(n),
+            grad: Vec::with_capacity(n),
+            ops: Vec::with_capacity(n),
+            dot_pairs: Vec::with_capacity(n * 4),
+            sum_idx: Vec::with_capacity(n),
+        }
+    }
 
-    fn leaf(&mut self, data: f64) -> usize {
-        let i = self.nodes.len();
-        self.nodes.push(Node { data, grad: 0.0, child0: NONE, child1: NONE, lg0: 0.0, lg1: 0.0 });
-        i
+    #[inline] fn leaf(&mut self, d: f64) -> usize {
+        let i = self.data.len();
+        self.data.push(d); self.grad.push(0.0); self.ops.push(Op::Leaf); i
     }
-    fn add(&mut self, a: usize, b: usize) -> usize {
-        let i = self.nodes.len();
-        self.nodes.push(Node { data: self.nodes[a].data + self.nodes[b].data, grad: 0.0,
-            child0: a, child1: b, lg0: 1.0, lg1: 1.0 });
-        i
+    #[inline] fn add(&mut self, a: usize, b: usize) -> usize {
+        let i = self.data.len();
+        self.data.push(self.data[a] + self.data[b]);
+        self.grad.push(0.0); self.ops.push(Op::Add(a, b)); i
     }
-    fn mul(&mut self, a: usize, b: usize) -> usize {
-        let (da, db) = (self.nodes[a].data, self.nodes[b].data);
-        let i = self.nodes.len();
-        self.nodes.push(Node { data: da * db, grad: 0.0, child0: a, child1: b, lg0: db, lg1: da });
-        i
+    #[inline] fn mul(&mut self, a: usize, b: usize) -> usize {
+        let i = self.data.len();
+        self.data.push(self.data[a] * self.data[b]);
+        self.grad.push(0.0); self.ops.push(Op::Mul(a, b)); i
     }
-    fn pow(&mut self, a: usize, exp: f64) -> usize {
-        let da = self.nodes[a].data;
-        let i = self.nodes.len();
-        self.nodes.push(Node { data: da.powf(exp), grad: 0.0, child0: a, child1: NONE,
-            lg0: exp * da.powf(exp - 1.0), lg1: 0.0 });
-        i
+    #[inline] fn pow(&mut self, a: usize, e: f64) -> usize {
+        let i = self.data.len();
+        self.data.push(self.data[a].powf(e));
+        self.grad.push(0.0); self.ops.push(Op::Pow(a, e)); i
     }
-    fn log(&mut self, a: usize) -> usize {
-        let da = self.nodes[a].data;
-        let i = self.nodes.len();
-        self.nodes.push(Node { data: da.ln(), grad: 0.0, child0: a, child1: NONE, lg0: 1.0 / da, lg1: 0.0 });
-        i
+    #[inline] fn log(&mut self, a: usize) -> usize {
+        let i = self.data.len();
+        self.data.push(self.data[a].ln());
+        self.grad.push(0.0); self.ops.push(Op::Log(a)); i
     }
-    fn exp(&mut self, a: usize) -> usize {
-        let e = self.nodes[a].data.exp();
-        let i = self.nodes.len();
-        self.nodes.push(Node { data: e, grad: 0.0, child0: a, child1: NONE, lg0: e, lg1: 0.0 });
-        i
+    #[inline] fn exp(&mut self, a: usize) -> usize {
+        let i = self.data.len();
+        let e = self.data[a].exp();
+        self.data.push(e); self.grad.push(0.0); self.ops.push(Op::Exp(a)); i
     }
-    fn relu(&mut self, a: usize) -> usize {
-        let da = self.nodes[a].data;
-        let i = self.nodes.len();
-        self.nodes.push(Node { data: if da > 0.0 { da } else { 0.0 }, grad: 0.0,
-            child0: a, child1: NONE, lg0: if da > 0.0 { 1.0 } else { 0.0 }, lg1: 0.0 });
-        i
+    #[inline] fn relu(&mut self, a: usize) -> usize {
+        let d = self.data[a];
+        let i = self.data.len();
+        self.data.push(if d > 0.0 { d } else { 0.0 });
+        self.grad.push(0.0); self.ops.push(Op::Relu(a)); i
     }
-    fn scalar_mul(&mut self, a: usize, s: f64) -> usize {
-        let i = self.nodes.len();
-        self.nodes.push(Node { data: self.nodes[a].data * s, grad: 0.0, child0: a, child1: NONE, lg0: s, lg1: 0.0 });
-        i
+    #[inline] fn scalar_mul(&mut self, a: usize, s: f64) -> usize {
+        let i = self.data.len();
+        self.data.push(self.data[a] * s);
+        self.grad.push(0.0); self.ops.push(Op::Smul(a, s)); i
+    }
+
+    /// Fused dot product: one node instead of 2n-1
+    fn dot(&mut self, ai: &[usize], bi: &[usize]) -> usize {
+        let start = self.dot_pairs.len();
+        let mut val = 0.0;
+        for k in 0..ai.len() {
+            val += self.data[ai[k]] * self.data[bi[k]];
+            self.dot_pairs.push((ai[k], bi[k]));
+        }
+        let i = self.data.len();
+        self.data.push(val); self.grad.push(0.0);
+        self.ops.push(Op::Dot(start, ai.len())); i
+    }
+
+    /// Fused sum: one node instead of n-1 adds
+    fn sum(&mut self, idx: &[usize]) -> usize {
+        let start = self.sum_idx.len();
+        let mut val = 0.0;
+        for &j in idx { val += self.data[j]; self.sum_idx.push(j); }
+        let i = self.data.len();
+        self.data.push(val); self.grad.push(0.0);
+        self.ops.push(Op::Sum(start, idx.len())); i
     }
 
     fn backward(&mut self) {
-        let n = self.nodes.len();
+        let n = self.data.len();
         if n == 0 { return; }
-        self.nodes[n - 1].grad = 1.0;
+        self.grad[n - 1] = 1.0;
         for i in (0..n).rev() {
-            let g = self.nodes[i].grad;
-            let (c0, c1, l0, l1) = (self.nodes[i].child0, self.nodes[i].child1,
-                                     self.nodes[i].lg0, self.nodes[i].lg1);
-            if c0 != NONE { self.nodes[c0].grad += l0 * g; }
-            if c1 != NONE { self.nodes[c1].grad += l1 * g; }
+            let g = self.grad[i];
+            if g == 0.0 { continue; }
+            unsafe {
+                match *self.ops.get_unchecked(i) {
+                    Op::Leaf => {},
+                    Op::Add(a, b) => {
+                        *self.grad.get_unchecked_mut(a) += g;
+                        *self.grad.get_unchecked_mut(b) += g;
+                    }
+                    Op::Mul(a, b) => {
+                        *self.grad.get_unchecked_mut(a) += *self.data.get_unchecked(b) * g;
+                        *self.grad.get_unchecked_mut(b) += *self.data.get_unchecked(a) * g;
+                    }
+                    Op::Pow(a, e) => {
+                        *self.grad.get_unchecked_mut(a) += e * self.data.get_unchecked(a).powf(e - 1.0) * g;
+                    }
+                    Op::Log(a) => {
+                        *self.grad.get_unchecked_mut(a) += g / *self.data.get_unchecked(a);
+                    }
+                    Op::Exp(a) => {
+                        *self.grad.get_unchecked_mut(a) += *self.data.get_unchecked(i) * g;
+                    }
+                    Op::Relu(a) => {
+                        if *self.data.get_unchecked(a) > 0.0 {
+                            *self.grad.get_unchecked_mut(a) += g;
+                        }
+                    }
+                    Op::Smul(a, s) => {
+                        *self.grad.get_unchecked_mut(a) += s * g;
+                    }
+                    Op::Dot(start, count) => {
+                        for j in start..start + count {
+                            let (ai, bi) = *self.dot_pairs.get_unchecked(j);
+                            *self.grad.get_unchecked_mut(ai) += *self.data.get_unchecked(bi) * g;
+                            *self.grad.get_unchecked_mut(bi) += *self.data.get_unchecked(ai) * g;
+                        }
+                    }
+                    Op::Sum(start, count) => {
+                        for j in start..start + count {
+                            *self.grad.get_unchecked_mut(*self.sum_idx.get_unchecked(j)) += g;
+                        }
+                    }
+                }
+            }
         }
     }
-}
 
-// --- Dot product ---
-fn dot(a_idx: &[usize], b_idx: &[usize], a: &mut Arena) -> usize {
-    let mut acc = a.mul(a_idx[0], b_idx[0]);
-    for i in 1..a_idx.len() {
-        let p = a.mul(a_idx[i], b_idx[i]);
-        acc = a.add(acc, p);
+    fn reset(&mut self, keep: usize) {
+        self.data.truncate(keep);
+        self.grad.truncate(keep);
+        self.ops.truncate(keep);
+        for g in &mut self.grad { *g = 0.0; }
+        self.dot_pairs.clear();
+        self.sum_idx.clear();
     }
-    acc
 }
 
-// --- Parameter Layout ---
+// --- Model functions ---
+
+fn linear(x: &[usize], w: &[Vec<usize>], a: &mut Arena) -> Vec<usize> {
+    w.iter().map(|wo| a.dot(wo, x)).collect()
+}
+
+fn softmax(logits: &[usize], a: &mut Arena) -> Vec<usize> {
+    let max_val = logits.iter().map(|&l| unsafe { *a.data.get_unchecked(l) }).fold(f64::NEG_INFINITY, f64::max);
+    let mx = a.leaf(max_val);
+    let neg_max = a.scalar_mul(mx, -1.0);
+    let exps: Vec<usize> = logits.iter().map(|&l| { let s = a.add(l, neg_max); a.exp(s) }).collect();
+    let total = a.sum(&exps);
+    let inv = a.pow(total, -1.0);
+    exps.iter().map(|&e| a.mul(e, inv)).collect()
+}
+
+fn rmsnorm(x: &[usize], a: &mut Arena) -> Vec<usize> {
+    let sq: Vec<usize> = x.iter().map(|&xi| a.mul(xi, xi)).collect();
+    let ss = a.sum(&sq);
+    let ms = a.scalar_mul(ss, 1.0 / x.len() as f64);
+    let eps = a.leaf(1e-5);
+    let ms_eps = a.add(ms, eps);
+    let scale = a.pow(ms_eps, -0.5);
+    x.iter().map(|&xi| a.mul(xi, scale)).collect()
+}
+
+fn gpt(
+    token_id: usize, pos_id: usize, pidx: &ParamIdx,
+    kv_k: &mut Vec<Vec<Vec<usize>>>, kv_v: &mut Vec<Vec<Vec<usize>>>,
+    a: &mut Arena,
+) -> Vec<usize> {
+    let mut x: Vec<usize> = pidx.wte[token_id].iter().zip(pidx.wpe[pos_id].iter())
+        .map(|(&t, &p)| a.add(t, p)).collect();
+    x = rmsnorm(&x, a);
+
+    for li in 0..N_LAYER {
+        let layer = &pidx.layers[li];
+        let x_res = x.clone();
+        x = rmsnorm(&x, a);
+
+        let q = linear(&x, &layer.attn_wq, a);
+        let k = linear(&x, &layer.attn_wk, a);
+        let v = linear(&x, &layer.attn_wv, a);
+        kv_k[li].push(k);
+        kv_v[li].push(v);
+
+        let scale = a.leaf(1.0 / (HEAD_DIM as f64).sqrt());
+        let mut x_attn = Vec::with_capacity(N_EMBD);
+        for h in 0..N_HEAD {
+            let hs = h * HEAD_DIM;
+            let q_h = &q[hs..hs + HEAD_DIM];
+            let k_h: Vec<&[usize]> = kv_k[li].iter().map(|ki| &ki[hs..hs + HEAD_DIM]).collect();
+            let v_h: Vec<&[usize]> = kv_v[li].iter().map(|vi| &vi[hs..hs + HEAD_DIM]).collect();
+
+            let attn_logits: Vec<usize> = k_h.iter().map(|ki| { let d = a.dot(q_h, ki); a.mul(d, scale) }).collect();
+            let w = softmax(&attn_logits, a);
+
+            for j in 0..HEAD_DIM {
+                let wv: Vec<usize> = w.iter().zip(v_h.iter()).map(|(&wi, vi)| a.mul(wi, vi[j])).collect();
+                x_attn.push(a.sum(&wv));
+            }
+        }
+
+        x = linear(&x_attn, &layer.attn_wo, a);
+        x = x.iter().zip(x_res.iter()).map(|(&ai, &b)| a.add(ai, b)).collect();
+
+        let x_res = x.clone();
+        x = rmsnorm(&x, a);
+        x = linear(&x, &layer.mlp_fc1, a);
+        x = x.iter().map(|&xi| a.relu(xi)).collect();
+        x = linear(&x, &layer.mlp_fc2, a);
+        x = x.iter().zip(x_res.iter()).map(|(&ai, &b)| a.add(ai, b)).collect();
+    }
+    linear(&x, &pidx.lm_head, a)
+}
+
+fn neglog(a: &mut Arena, x: usize) -> usize { let l = a.log(x); a.scalar_mul(l, -1.0) }
+
+fn mean(vals: &[usize], a: &mut Arena) -> usize {
+    let s = a.sum(vals);
+    a.scalar_mul(s, 1.0 / vals.len() as f64)
+}
+
+fn tokenize(doc: &str, bos: usize, c2i: &std::collections::HashMap<char, usize>) -> Vec<usize> {
+    let mut t = vec![bos];
+    t.extend(doc.chars().map(|c| c2i[&c]));
+    t.push(bos);
+    t
+}
+
+// --- Parameter layout ---
 
 struct LayerIdx {
     attn_wq: Vec<Vec<usize>>,
@@ -148,123 +305,12 @@ fn init_param_data(n: usize, rng: &mut StdRng) -> Vec<f64> {
     (0..n).map(|_| rng.sample(normal)).collect()
 }
 
-// --- Model ---
-
-fn linear(x: &[usize], w: &[Vec<usize>], a: &mut Arena) -> Vec<usize> {
-    w.iter().map(|wo| dot(wo, x, a)).collect()
-}
-
-fn softmax(logits: &[usize], a: &mut Arena) -> Vec<usize> {
-    let max_val = logits.iter().map(|&l| a.nodes[l].data).fold(f64::NEG_INFINITY, f64::max);
-    let max_n = a.leaf(max_val);
-    let neg_max = a.scalar_mul(max_n, -1.0);
-    let mut exps = Vec::with_capacity(logits.len());
-    for &l in logits {
-        let shifted = a.add(l, neg_max);
-        exps.push(a.exp(shifted));
-    }
-    let mut total = exps[0];
-    for i in 1..exps.len() { total = a.add(total, exps[i]); }
-    let inv = a.pow(total, -1.0);
-    exps.iter().map(|&e| a.mul(e, inv)).collect()
-}
-
-fn rmsnorm(x: &[usize], a: &mut Arena) -> Vec<usize> {
-    let n = x.len();
-    let mut sum_sq = a.mul(x[0], x[0]);
-    for i in 1..n {
-        let sq = a.mul(x[i], x[i]);
-        sum_sq = a.add(sum_sq, sq);
-    }
-    let ms = a.scalar_mul(sum_sq, 1.0 / n as f64);
-    let eps = a.leaf(1e-5);
-    let ms_eps = a.add(ms, eps);
-    let scale = a.pow(ms_eps, -0.5);
-    x.iter().map(|&xi| a.mul(xi, scale)).collect()
-}
-
-fn gpt(
-    token_id: usize, pos_id: usize, pidx: &ParamIdx,
-    kv_k: &mut Vec<Vec<Vec<usize>>>, kv_v: &mut Vec<Vec<Vec<usize>>>,
-    a: &mut Arena,
-) -> Vec<usize> {
-    let mut x: Vec<usize> = pidx.wte[token_id].iter().zip(pidx.wpe[pos_id].iter())
-        .map(|(&t, &p)| a.add(t, p)).collect();
-    x = rmsnorm(&x, a);
-
-    for li in 0..N_LAYER {
-        let layer = &pidx.layers[li];
-        let x_res = x.clone();
-        x = rmsnorm(&x, a);
-
-        let q = linear(&x, &layer.attn_wq, a);
-        let k = linear(&x, &layer.attn_wk, a);
-        let v = linear(&x, &layer.attn_wv, a);
-        kv_k[li].push(k.clone());
-        kv_v[li].push(v.clone());
-
-        let scale_val = 1.0 / (HEAD_DIM as f64).sqrt();
-        let mut x_attn = Vec::with_capacity(N_EMBD);
-        for h in 0..N_HEAD {
-            let hs = h * HEAD_DIM;
-            let q_h = &q[hs..hs + HEAD_DIM];
-            let k_h: Vec<&[usize]> = kv_k[li].iter().map(|ki| &ki[hs..hs + HEAD_DIM]).collect();
-            let v_h: Vec<&[usize]> = kv_v[li].iter().map(|vi| &vi[hs..hs + HEAD_DIM]).collect();
-
-            let scale = a.leaf(scale_val);
-            let mut attn_logits = Vec::with_capacity(k_h.len());
-            for ki in &k_h {
-                let d = dot(q_h, ki, a);
-                attn_logits.push(a.mul(d, scale));
-            }
-            let w = softmax(&attn_logits, a);
-
-            for j in 0..HEAD_DIM {
-                let mut out = a.mul(w[0], v_h[0][j]);
-                for t in 1..w.len() {
-                    let prod = a.mul(w[t], v_h[t][j]);
-                    out = a.add(out, prod);
-                }
-                x_attn.push(out);
-            }
-        }
-
-        x = linear(&x_attn, &layer.attn_wo, a);
-        x = x.iter().zip(x_res.iter()).map(|(&ai, &b)| a.add(ai, b)).collect();
-
-        let x_res = x.clone();
-        x = rmsnorm(&x, a);
-        x = linear(&x, &layer.mlp_fc1, a);
-        x = x.iter().map(|&xi| a.relu(xi)).collect();
-        x = linear(&x, &layer.mlp_fc2, a);
-        x = x.iter().zip(x_res.iter()).map(|(&ai, &b)| a.add(ai, b)).collect();
-    }
-    linear(&x, &pidx.lm_head, a)
-}
-
-fn neglog(a: &mut Arena, x: usize) -> usize { let l = a.log(x); a.scalar_mul(l, -1.0) }
-
-fn mean(vals: &[usize], a: &mut Arena) -> usize {
-    let mut s = vals[0];
-    for i in 1..vals.len() { s = a.add(s, vals[i]); }
-    a.scalar_mul(s, 1.0 / vals.len() as f64)
-}
-
-fn tokenize(doc: &str, bos: usize, c2i: &std::collections::HashMap<char, usize>) -> Vec<usize> {
-    let mut t = vec![bos];
-    t.extend(doc.chars().map(|c| c2i[&c]));
-    t.push(bos);
-    t
-}
-
-// --- Main ---
-
 fn main() {
     let t0 = Instant::now();
 
-    let input_path = if std::path::Path::new("input.txt").exists() { "input.txt" }
-        else if std::path::Path::new("microgpt/input.txt").exists() { "microgpt/input.txt" }
-        else { panic!("input.txt not found") };
+    let candidates = ["input.txt", "microgpt/input.txt", "../microgpt/input.txt"];
+    let input_path = candidates.iter().find(|p| std::path::Path::new(p).exists())
+        .unwrap_or_else(|| panic!("input.txt not found, searched: {:?}", candidates));
     let mut docs: Vec<String> = std::fs::read_to_string(input_path).expect("read")
         .lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect();
     let mut rng = StdRng::seed_from_u64(42);
@@ -291,13 +337,12 @@ fn main() {
     let eps_adam = 1e-8f64;
     let num_steps = 1000usize;
 
-    // --- Training (single-threaded, arena reused via truncation) ---
-    let mut arena = Arena::with_capacity(80_000);
-    // Initialize arena with parameter leaf nodes
+    // Training (arena reused via reset — fewer nodes thanks to fused ops)
+    let mut arena = Arena::with_capacity(30_000);
     for &d in &param_data { arena.leaf(d); }
+
     for step in 0..num_steps {
-        arena.nodes.truncate(n_params);
-        for n in &mut arena.nodes { n.grad = 0.0; }
+        arena.reset(n_params);
 
         let doc = &docs[step % docs.len()];
         let tokens = tokenize(doc, bos, &c2i);
@@ -318,26 +363,24 @@ fn main() {
         let bc1 = 1.0 - beta1.powi(step as i32 + 1);
         let bc2 = 1.0 - beta2.powi(step as i32 + 1);
         for i in 0..n_params {
-            let g = arena.nodes[i].grad;
+            let g = arena.grad[i];
             m[i] = beta1 * m[i] + (1.0 - beta1) * g;
             v[i] = beta2 * v[i] + (1.0 - beta2) * g * g;
-            arena.nodes[i].data -= lr * (m[i] / bc1) / ((v[i] / bc2).sqrt() + eps_adam);
+            arena.data[i] -= lr * (m[i] / bc1) / ((v[i] / bc2).sqrt() + eps_adam);
         }
 
-        print!("\rstep {:4} / {} | loss {:.4}", step + 1, num_steps, arena.nodes[loss].data);
+        print!("\rstep {:4} / {} | loss {:.4}", step + 1, num_steps, arena.data[loss]);
         let _ = std::io::stdout().flush();
     }
 
-    // Copy final param data
-    for i in 0..n_params { param_data[i] = arena.nodes[i].data; }
+    for i in 0..n_params { param_data[i] = arena.data[i]; }
 
-    // --- Inference ---
+    // Inference
     println!("\n--- inference (new, hallucinated names) ---");
     let temp = 0.5f64;
 
     for si in 0..20 {
-        arena.nodes.truncate(n_params);
-        for n in &mut arena.nodes { n.grad = 0.0; }
+        arena.reset(n_params);
         let mut kv_k: Vec<Vec<Vec<usize>>> = vec![vec![]; N_LAYER];
         let mut kv_v: Vec<Vec<Vec<usize>>> = vec![vec![]; N_LAYER];
         let mut tok = bos;
@@ -345,9 +388,9 @@ fn main() {
 
         for pos in 0..BLOCK_SIZE {
             let logits = gpt(tok, pos, &pidx, &mut kv_k, &mut kv_v, &mut arena);
-            let max_l = logits.iter().map(|&l| arena.nodes[l].data).fold(f64::NEG_INFINITY, f64::max);
+            let max_l = logits.iter().map(|&l| arena.data[l]).fold(f64::NEG_INFINITY, f64::max);
             let mut probs: Vec<f64> = logits.iter()
-                .map(|&l| ((arena.nodes[l].data - max_l) / temp).exp()).collect();
+                .map(|&l| ((arena.data[l] - max_l) / temp).exp()).collect();
             let s: f64 = probs.iter().sum();
             for p in &mut probs { *p /= s; }
             tok = rng.sample(rand::distr::weighted::WeightedIndex::new(&probs).unwrap());
