@@ -1,5 +1,6 @@
 ## 李好，这里是计算机系统课上代码&大作业的repo
 - 除本branch外，每个分支均独立包含一个大作业，有详细Readme文件
+- 这个branch仅仅只包含一个readme！切换分支后才能查看其余lab
 
 - **如果派上用场，记得star哦**
 
@@ -11,7 +12,7 @@
 | 实验四-Y86-64指令模拟器 | 已更新完毕 | lab4 |
 | 实验五-分支预测器 | 已更新完毕 | lab5 |
 | 实验六-性能优化实验 | 已更新完毕 | lab6 |
-| 实验七-性能优化实验 | 正在更新中 | lab7 |
+| 实验七-性能优化实验 | 已更新完毕 | lab7 |
 ···
 ···
 
@@ -31,6 +32,6 @@ git checkout lab1    #此处lab1可更换为需要查看的分支
 - [实验四](https://github.com/ren-yi-NUDT/CS-lab/blob/lab4/README.md "实验四readme链接")
 - [实验五](https://github.com/ren-yi-NUDT/CS-lab/blob/lab5/README.md "实验五readme链接")
 - [实验六](https://github.com/ren-yi-NUDT/CS-lab/blob/lab6/README.md "实验六readme链接")
-  
+- [实验七](https://github.com/ren-yi-NUDT/CS-lab/blob/lab7/README.md "实验七readme链接")
   
    ···
