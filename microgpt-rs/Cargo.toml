@@ -6,8 +6,8 @@ edition = "2021"
 [dependencies]
 rand = "0.9"
 rand_distr = "0.5"
-rayon = "1.10"
 
 [profile.release]
 opt-level = 3
 lto = true
+codegen-units = 1
