@@ -1,0 +1,42 @@
+{
+  "name": "Level 2 - 全局危机 (Global Crisis)",
+  "desc": "全局变量 gvar=108 的取地址操作导致 R_X86_64_32/32S",
+  "score": 20,
+  "checks": [
+    {
+      "check": "elf_valid"
+    },
+    {
+      "check": "no_textrel"
+    },
+    {
+      "check": "func_test"
+    }
+  ],
+  "tests": [
+    {
+      "name": "read_var",
+      "args": [],
+      "expected": 108
+    },
+    {
+      "name": "get_elem",
+      "args": [
+        2
+      ],
+      "expected": 30
+    },
+    {
+      "name": "get_elem",
+      "args": [
+        4
+      ],
+      "expected": 50
+    },
+    {
+      "name": "get_addr",
+      "args": [],
+      "expected": null
+    }
+  ]
+}

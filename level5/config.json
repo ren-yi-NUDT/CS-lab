@@ -1,0 +1,62 @@
+{
+  "name": "Level 5 - 终极链接炸弹 (Ultimate Link Bomb)",
+  "desc": "综合关卡: 需要 PIC 替代 + objcopy + TEXTREL 修补",
+  "score": 50,
+  "checks": [
+    {
+      "check": "elf_valid"
+    },
+    {
+      "check": "no_textrel"
+    },
+    {
+      "check": "func_test"
+    }
+  ],
+  "tests": [
+    {
+      "name": "read_shared",
+      "args": [],
+      "expected": 501
+    },
+    {
+      "name": "next_val",
+      "args": [],
+      "expected": 43
+    },
+    {
+      "name": "next_val",
+      "args": [],
+      "expected": 44
+    },
+    {
+      "name": "next_val",
+      "args": [],
+      "expected": 45
+    },
+    {
+      "name": "sum_data",
+      "args": [],
+      "expected": 367
+    },
+    {
+      "name": "helper_double",
+      "args": [
+        7
+      ],
+      "expected": 14
+    },
+    {
+      "name": "helper_square",
+      "args": [
+        7
+      ],
+      "expected": 49
+    },
+    {
+      "name": "shared_addr",
+      "args": [],
+      "expected": null
+    }
+  ]
+}

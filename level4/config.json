@@ -1,0 +1,32 @@
+{
+  "name": "Level 4 - 二进制手术师 (Binary Surgeon)",
+  "desc": "base_val=71, .rodata 重定位导致 TEXTREL",
+  "score": 25,
+  "checks": [
+    {
+      "check": "elf_valid"
+    },
+    {
+      "check": "no_textrel"
+    },
+    {
+      "check": "func_test"
+    }
+  ],
+  "tests": [
+    {
+      "name": "compute",
+      "args": [
+        5
+      ],
+      "expected": 76
+    },
+    {
+      "name": "compute",
+      "args": [
+        20
+      ],
+      "expected": 91
+    }
+  ]
+}

@@ -55,26 +55,23 @@ SHT_RELA = 4             # RELA类型重定位节
 
 def read_u16(data, offset):
     """从指定偏移读取2字节小端无符号整数"""
-    # TODO: 实现读取 uint16
-    pass
+    return struct.unpack_from('<H', data, offset)[0]
 
 
 def read_u32(data, offset):
     """从指定偏移读取4字节小端无符号整数"""
-    # TODO: 实现读取 uint32
-    pass
+    return struct.unpack_from('<I', data, offset)[0]
 
 
 def read_u64(data, offset):
     """从指定偏移读取8字节小端无符号整数"""
-    # TODO: 实现读取 uint64
-    pass
+    return struct.unpack_from('<Q', data, offset)[0]
 
 
 def write_u64(data, offset, val):
     """在指定偏移写入8字节小端无符号整数，返回修改后的数据"""
-    # TODO: 实现写入 uint64
-    pass
+    struct.pack_into('<Q', data, offset, val)
+    return data
 
 
 def get_section_name(data, shdr_offset, shdr_entsize, shstrndx, sh_name_off):
@@ -96,8 +93,15 @@ def get_section_name(data, shdr_offset, shdr_entsize, shstrndx, sh_name_off):
       2. 从节区头部读取 sh_offset (文件偏移) 和 sh_size (大小)
       3. 在 .shstrtab 数据中，以 sh_name_off 为起点找到下一个 \\0 结束
     """
-    # TODO: 实现节区名查找
-    pass
+    # 定位 .shstrtab 节区头部
+    shstrtab_hdr_off = shdr_offset + shstrndx * shdr_entsize
+    shstrtab_offset = read_u64(data, shstrtab_hdr_off + 24)
+    shstrtab_size = read_u64(data, shstrtab_hdr_off + 32)
+
+    # 在字符串表中查找以 sh_name_off 为起点的节区名
+    start = shstrtab_offset + sh_name_off
+    end = data.index(b'\x00', start)
+    return data[start:end].decode('ascii')
 
 
 def find_sections_with_textrel(data):
@@ -126,12 +130,11 @@ def find_sections_with_textrel(data):
         print("ERROR: Only 64-bit ELF is supported")
         return []
 
-    # TODO: 从 ELF header 读取节区头部表信息
-    # 提示: 使用 read_u64/read_u16 读取 e_shoff, e_shentsize, e_shnum, e_shstrndx
-    shdr_offset = None  # 从偏移 40 读取
-    shdr_entsize = None  # 从偏移 58 读取
-    shdr_count = None    # 从偏移 60 读取
-    shstrndx = None      # 从偏移 62 读取
+    # 从 ELF header 读取节区头部表信息
+    shdr_offset = read_u64(data, 40)
+    shdr_entsize = read_u16(data, 58)
+    shdr_count = read_u16(data, 60)
+    shstrndx = read_u16(data, 62)
 
     if shdr_offset is None:
         print("ERROR: Failed to parse ELF header")
@@ -141,23 +144,22 @@ def find_sections_with_textrel(data):
     for i in range(shdr_count):
         hdr_off = shdr_offset + i * shdr_entsize
         
-        # TODO: 读取节区类型 (sh_type)
-        sh_type = None
+        # 读取节区类型 (sh_type)
+        sh_type = read_u32(data, hdr_off + 4)
         
         if sh_type != SHT_RELA:
             continue
         
-        # TODO: 从 sh_info 获取目标节区索引
-        # sh_info 位于节区头部偏移 44
-        target_idx = None
+        # 从 sh_info 获取目标节区索引
+        target_idx = read_u32(data, hdr_off + 44)
         
         # TODO: 解析目标节区的信息
         target_hdr = shdr_offset + target_idx * shdr_entsize
         tgt_name_off = read_u32(data, target_hdr)
         tgt_name = get_section_name(data, shdr_offset, shdr_entsize, shstrndx, tgt_name_off)
         
-        # TODO: 读取目标节区的标志 (sh_flags)
-        tgt_flags = None
+        # 读取目标节区的标志 (sh_flags)
+        tgt_flags = read_u64(data, target_hdr + 8)
         
         # 判断是否为只读已分配节区（非可执行）
         is_readonly_alloc = (tgt_flags & SHF_ALLOC) and not (tgt_flags & SHF_WRITE)
@@ -185,7 +187,7 @@ def fix_textrel(obj_path, output_path=None):
         data = bytearray(f.read())
 
     problems = find_sections_with_textrel(bytes(data))
-    
+
     if not problems:
         print("  No TEXTREL issues found (already clean)")
         with open(output_path, 'wb') as f:
@@ -193,12 +195,15 @@ def fix_textrel(obj_path, output_path=None):
         return True
 
     print(f"  Found {len(problems)} section(s) with TEXTREL risk")
-    
-    # TODO: 对每个有问题的节区，添加 SHF_WRITE 标志
-    # 提示: 使用 write_u64 修改节区头部中的 sh_flags 字段
+
+    shdr_offset = read_u64(data, 40)
+    shdr_entsize = read_u16(data, 58)
+
     for idx, name, flags in problems:
-        # TODO: 计算节区头部偏移并添加可写标志
-        pass
+        hdr_off = shdr_offset + idx * shdr_entsize
+        new_flags = flags | SHF_WRITE
+        write_u64(data, hdr_off + 8, new_flags)
+        print(f"  Patched '{name}': flags 0x{flags:x} -> 0x{new_flags:x}")
 
     with open(output_path, 'wb') as f:
         f.write(data)
@@ -222,9 +227,15 @@ def print_elf_info(obj_path):
         print("Only 64-bit ELF is supported")
         return
     
-    # TODO: 从 ELF header 读取并打印关键信息
-    # 1. 使用 read_u16/read_u32/read_u64 解析头部
-    # 2. 打印: 节区数量、节区头部表偏移、字符串表索引
+    # 从 ELF header 读取并打印关键信息
+    shdr_offset = read_u64(data, 40)
+    shdr_entsize = read_u16(data, 58)
+    shdr_count = read_u16(data, 60)
+    shstrndx = read_u16(data, 62)
+    print(f"  Section header offset: {shdr_offset}")
+    print(f"  Section header entry size: {shdr_entsize}")
+    print(f"  Number of sections: {shdr_count}")
+    print(f"  String table index: {shstrndx}")
 
 
 def main():
