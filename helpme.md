@@ -296,7 +296,7 @@ get_elem:
 | `get_elem(i)` | 返回静态数组 `arr[i]`，其中 `arr = {10,20,30,40,50}` |
 
 从 config.json 得知 `gvar = 108`（看 `desc` 字段和 `read_var` 的 `expected` 值）。
-
+长度
 写一个新文件 `lv2_pic.c`：
 
 ```c
