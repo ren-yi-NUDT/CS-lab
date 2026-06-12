@@ -1,39 +1,68 @@
-## 李好，这里是计算机系统课上代码&大作业的repo
-- 除本branch外，每个分支均独立包含一个大作业，有详细Readme文件
-- 这个branch仅仅只包含一个readme！切换分支后才能查看其余lab
+#####################################################################
+# CS:APP Shell Lab
+# Directions to Instructors
+#
+# Copyright (c) 2002, R. Bryant and D. O'Hallaron, All rights reserved.
+# May not be used, modified, or copied without permission.
+#
+######################################################################
 
-- **如果派上用场，记得star哦**
+This directory contains the files that you will need to run the CS:APP
+shell lab. The lab is the student's first experience with systems-level
+programming, and teaches them about processes, process control, and
+signals.
 
-| 实验名称 | 状态 | 对应分支 |
-|--------------|-----------|-----------|
-| 实验一-位运算 | 已更新完毕 | lab1 |
-| 实验二-二进制炸弹 | 已更新完毕 | lab2 |
-| 实验三-缓冲区炸弹 | 已更新完毕 | lab3 |
-| 实验四-Y86-64指令模拟器 | 已更新完毕 | lab4 |
-| 实验五-分支预测器 | 已更新完毕 | lab5 |
-| 实验六-性能优化实验 | 已更新完毕 | lab6 |
-| 实验七-Cache模拟器实验 | 已更新完毕 | lab7 |
-| 实验八-链接炸弹 | 已更新完毕 | lab8 |
+************
+1. Overview
+************
 
-···
-···
+In this lab, students build a simple Unix shell with job control.
+They are given a skeleton called tsh.c (Tiny Shell) that implements
+some of the less interesting functions, and are then asked to
+implement the functions and signal handlers that provide job control.
 
-### 使用说明：
+Students evaluate the functionality of their shells using a
+trace-driven driver program called sdriver.pl.
 
-1. 方法1：clone到本地查看
-```bash
-git clone https://github.com/ren-yi-NUDT/CS-lab.git
-git checkout lab1    #此处lab1可更换为需要查看的分支
-```
+The reference solution is in ./src/tsh.c
 
-2. 方法2：在github网页查看README文档
+********
+2. Files
+********
 
-- [实验一](https://github.com/ren-yi-NUDT/CS-lab/blob/lab1/README.txt "实验一readme链接")
-- [实验二](https://github.com/ren-yi-NUDT/CS-lab/blob/lab2/README.md "实验二readme链接")
-- [实验三](https://github.com/ren-yi-NUDT/CS-lab/blob/lab3/README.md "实验三readme链接")
-- [实验四](https://github.com/ren-yi-NUDT/CS-lab/blob/lab4/README.md "实验四readme链接")
-- [实验五](https://github.com/ren-yi-NUDT/CS-lab/blob/lab5/README.md "实验五readme链接")
-- [实验六](https://github.com/ren-yi-NUDT/CS-lab/blob/lab6/README.md "实验六readme链接")
-- [实验七](https://github.com/ren-yi-NUDT/CS-lab/blob/lab7/README.md "实验七readme链接")
-  
-   ···
+README
+grade/			Autograding scripts
+shlab-handout/		Handout directory that is given to the students
+src/			Trace-driven driver program
+writeup/		Sample Latex lab writeup
+
+*******************
+3. Building the Lab
+*******************
+
+To build the lab, modify the Latex lab writeup in ./writeup/shlab.tex
+for your environment. Then type the following in the current
+directory:
+
+	unix> make clean
+	unix> make 
+
+The Makefile generates the driver code, formats the lab writeup, and
+then copies the driver code to the shlab-handout directory.  Finally,
+it builds a tarfile of the shlab-handout directory (in
+shlab-handout.tar) which you can distribute to students.  The command:
+
+	unix> make dist DEST=<DIR>
+
+will copy the tarfile and copies of the writeup to directory <DIR>,
+where the students can access it.
+
+
+**********************
+4. Autograding the Lab
+**********************
+
+There is an autograding script that automatically grades the lab.  See
+./grade/README for instructions.
+
+
