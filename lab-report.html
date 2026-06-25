@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shell Lab 实验报告 — 202402720028</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --text-dim: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --yellow: #d2991d;
+    --red: #f85149;
+    --code-bg: #1c2129;
+    --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    line-height: 1.7;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* ── header ── */
+  header {
+    text-align: center;
+    padding: 48px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+  header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #f0f6fc;
+  }
+  header .meta {
+    margin-top: 10px;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+  }
+  header .badge {
+    display: inline-block;
+    margin-top: 14px;
+    padding: 5px 16px;
+    border-radius: 20px;
+    background: rgba(63,185,80,0.15);
+    color: var(--green);
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+
+  /* ── sections ── */
+  section {
+    margin-bottom: 44px;
+  }
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #f0f6fc;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin: 28px 0 10px;
+  }
+  p { margin-bottom: 12px; color: var(--text-dim); }
+
+  /* ── code blocks ── */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 22px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    line-height: 1.55;
+    margin: 14px 0;
+  }
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+  }
+  p code, li code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── tables ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 0.88rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    color: #f0f6fc;
+    font-weight: 600;
+    background: var(--surface);
+  }
+  td { color: var(--text-dim); }
+
+  /* ── timeline ── */
+  .timeline {
+    position: relative;
+    padding-left: 28px;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 4px;
+    bottom: 4px;
+    width: 2px;
+    background: var(--border);
+  }
+  .timeline .step {
+    position: relative;
+    margin-bottom: 22px;
+  }
+  .timeline .step::before {
+    content: '';
+    position: absolute;
+    left: -22px;
+    top: 7px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .timeline .step .title {
+    font-weight: 600;
+    color: #f0f6fc;
+  }
+  .timeline .step .desc {
+    color: var(--text-dim);
+    font-size: 0.88rem;
+    margin-top: 2px;
+  }
+
+  /* ── cards ── */
+  .card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 14px 0;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px;
+  }
+  .card .card-title {
+    font-weight: 600;
+    color: #f0f6fc;
+    margin-bottom: 6px;
+    font-size: 0.92rem;
+  }
+  .card .card-body {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+  }
+
+  /* ── highlight ── */
+  .highlight {
+    border-left: 3px solid var(--accent);
+    padding: 10px 16px;
+    margin: 14px 0;
+    background: rgba(88,166,255,0.06);
+    border-radius: 0 6px 6px 0;
+    font-size: 0.9rem;
+    color: var(--text-dim);
+  }
+  .highlight strong { color: #f0f6fc; }
+
+  /* ── pass list ── */
+  .pass-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 20px;
+    margin: 10px 0;
+  }
+  .pass-list span {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: var(--green);
+  }
+
+  /* ── footer ── */
+  footer {
+    margin-top: 50px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.82rem;
+  }
+
+  @media (max-width: 600px) {
+    .card-grid { grid-template-columns: 1fr; }
+    .pass-list { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>CS:APP Shell Lab</h1>
+  <div class="meta">计算机系统基础 · 实验报告 · 学号 202402720028</div>
+  <div class="badge">16/16 traces 全部通过</div>
+</header>
+
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <h2>1. 实验是什么？</h2>
+  <p>
+    在骨架文件 <code>tsh.c</code> 上补全 <strong>7 个核心函数</strong>，实现一个支持前台/后台任务运行、
+    作业控制（<code>jobs</code> / <code>fg</code> / <code>bg</code>）、
+    信号转发（Ctrl-C / Ctrl-Z）的<strong>微型 Unix Shell</strong>。所有修改集中在 <code>tsh.c</code>，骨架已有的 <code>main</code>、<code>parseline</code>、任务列表辅助函数等不做任何修改。
+  </p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-title">要实现的 7 个函数</div>
+      <div class="card-body">
+        <code>eval</code> · <code>builtin_cmd</code> · <code>do_bgfg</code> · <code>waitfg</code><br>
+        <code>sigchld_handler</code> · <code>sigint_handler</code> · <code>sigtstp_handler</code>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">骨架已提供的内容</div>
+      <div class="card-body">
+        <code>main</code> 读写循环 · <code>parseline</code> 命令行解析<br>
+        <code>addjob / deletejob / listjobs / fgpid</code> 等作业列表操作<br>
+        <code>Signal()</code> 信号注册包装函数
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <h2>2. 我的实现过程</h2>
+
+  <div class="timeline">
+    <div class="step">
+      <div class="title">第一步：理解骨架 + 编译环境</div>
+      <div class="desc">
+        先 <code>make</code> 保证骨架编译通过（此时 <code>./tsh</code> 能启动但任何外部命令都执行不了）。
+        阅读 <code>main</code> 了解主循环结构：注册三个信号 handler → 初始化 job list → 循环
+        <code>fgets → eval → fflush</code>。
+      </div>
+    </div>
+    <div class="step">
+      <div class="title">第二步：实现 <code>builtin_cmd</code></div>
+      <div class="desc">
+        最简单的起点——识别 <code>quit</code> / <code>jobs</code> / <code>bg</code> / <code>fg</code> 四种内置命令。
+        返回 1 表示已处理，返回 0 交给 <code>eval</code> 去 fork。
+      </div>
+    </div>
+    <div class="step">
+      <div class="title">第三步：实现 <code>eval</code> + <code>waitfg</code></div>
+      <div class="desc">
+        整个 shell 的核心。fork 子进程 → 子进程 <code>setpgid(0,0)</code> 建独立进程组 →
+        <code>execve</code> 替换程序映像；父进程 addjob 后根据前台/后台决定 wait 还是立即返回。
+        <strong>关键：fork 前屏蔽 SIGCHLD，addjob 后解除</strong>，消除竞态条件。
+      </div>
+    </div>
+    <div class="step">
+      <div class="title">第四步：实现三个信号 handler</div>
+      <div class="desc">
+        先写 <code>sigchld_handler</code>——用 <code>waitpid(-1, &status, WNOHANG|WUNTRACED)</code>
+        在 while 循环中回收所有僵尸/停止的子进程。再写 <code>sigint_handler</code> 和
+        <code>sigtstp_handler</code>——向 <code>fgpid(jobs)</code> 对应进程组发送
+        <code>kill(-pid, SIGINT/TSTP)</code>。
+      </div>
+    </div>
+    <div class="step">
+      <div class="title">第五步：实现 <code>do_bgfg</code></div>
+      <div class="desc">
+        处理 <code>bg %n</code> / <code>fg %n</code> / <code>bg PID</code> / <code>fg PID</code>
+        四种格式，含完整错误处理。用 <code>kill(-pid, SIGCONT)</code> 向整组发送继续信号，然后
+        改状态并决定是否 wait。
+      </div>
+    </div>
+    <div class="step">
+      <div class="title">第六步：逐 trace 调试</div>
+      <div class="desc">
+        用 <code>./sdriver.pl -t traceXX.txt -s ./tsh -a "-p"</code> 逐个跑测试，
+        与 <code>tshref.out</code> 对比。遇到的主要 bug：<code>sigchld_handler</code> 里
+        先 deletejob 后 pid2jid 导致 jid=0、错误信息格式不匹配 trace14、以及 ps 输出的环境噪声。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <h2>3. 核心设计决策（验收重点）</h2>
+
+  <div class="highlight">
+    <strong>① 进程组隔离 — <code>setpgid(0,0)</code></strong><br>
+    每个前台任务放入独立进程组。这样 <code>kill(-pgid, sig)</code> 只影响该任务（及其 fork 出的子进程），
+    shell 自身和其他后台任务不受影响。如果缺少这行，Ctrl-C 会直接把 shell 也杀掉。
+  </div>
+
+  <div class="highlight">
+    <strong>② SIGCHLD 临界区保护</strong><br>
+    fork 前 <code>sigprocmask(SIG_BLOCK, &mask, &prev)</code> 屏蔽 SIGCHLD →
+    fork → 父进程 addjob →
+    <code>sigprocmask(SIG_SETMASK, &prev, NULL)</code> 解除屏蔽。<br>
+    如果不屏蔽：子进程可能秒退 → 内核发 SIGCHLD → handler 执行 deletejob → 但父进程还没 addjob →
+    jobs 列表出现永远删不掉的"幽灵任务"。
+  </div>
+
+  <div class="highlight">
+    <strong>③ <code>kill(-pid, sig)</code> 向进程组广播</strong><br>
+    负号 PID 表示"以该 PID 为组长的整个进程组"。对于 <code>mysplit</code>（会 fork 子进程的测试程序），
+    必须用负号才能确保父子进程同时收到信号，否则只能杀/停父进程，子进程变成孤儿。
+  </div>
+
+  <div class="highlight">
+    <strong>④ <code>sigsuspend</code> 而非 <code>sleep(1)</code></strong><br>
+    <code>waitfg</code> 中不调用 <code>waitpid</code>（回收已在 handler 完成），
+    而是用 <code>sigsuspend(&mask)</code> 原子地挂起等待任意信号。
+    相比忙等，响应即时且不浪费 CPU。
+  </div>
+
+  <div class="highlight">
+    <strong>⑤ handler 中 while 循环 + errno 保护</strong><br>
+    内核会合并信号——一次 SIGCHLD 可能对应多个子进程退出。用 <code>while</code> 而非 <code>if</code>
+    确保全部回收。保存/恢复 <code>errno</code> 防止 handler 污染主流程中被中断的系统调用。
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <h2>4. 七个函数的设计逻辑</h2>
+
+  <h3>4.1 <code>builtin_cmd(argv)</code></h3>
+  <p>判断 <code>argv[0]</code> 是否为内置命令。是 → 执行并返回 1；否 → 返回 0。</p>
+  <pre>if      (!strcmp(argv[0], "quit")) exit(0);
+else if (!strcmp(argv[0], "&"))    return 1;   // 无意义的单独 &
+else if (!strcmp(argv[0], "jobs")) { listjobs(jobs); return 1; }
+else if (!strcmp(argv[0], "bg") || !strcmp(argv[0], "fg")) { do_bgfg(argv); return 1; }
+else return 0;  // 不是内置命令</pre>
+
+  <h3>4.2 <code>eval(cmdline)</code></h3>
+  <p>主执行入口。解析命令行 → 判断内置命令 → 非内置则 fork+exec。</p>
+  <pre>parseline(buf, argv);                    // 解析，返回 bg
+if (argv[0] == NULL) return;
+if (builtin_cmd(argv)) return;
+
+sigprocmask(SIG_BLOCK, &mask, &prev);   // ★ 屏蔽 SIGCHLD
+if ((pid = fork()) == 0) {
+    sigprocmask(SIG_SETMASK, &prev, 0); // 子进程恢复屏蔽
+    setpgid(0, 0);                       // ★ 独立进程组
+    execve(argv[0], argv, environ);      // 替换程序映像
+}
+addjob(jobs, pid, bg ? BG : FG, cmdline);
+sigprocmask(SIG_SETMASK, &prev, 0);     // ★ 解除屏蔽
+
+if (!bg) waitfg(pid);                    // 前台：挂起等待
+else printf("[%d] (%d) %s", jid, pid, cmdline); // 后台：打印后立即返回</pre>
+
+  <h3>4.3 <code>waitfg(pid)</code></h3>
+  <pre>sigset_t mask;
+sigemptyset(&mask);
+while (fgpid(jobs) == pid)
+    sigsuspend(&mask);   // 原子挂起，等任意信号到来后检查</pre>
+
+  <h3>4.4 <code>sigchld_handler(sig)</code></h3>
+  <pre>int olderr = errno;
+while ((pid = waitpid(-1, &status, WNOHANG | WUNTRACED)) > 0) {
+    if (WIFEXITED(status))
+        deletejob(jobs, pid);              // 正常退出，删
+    else if (WIFSIGNALED(status)) {
+        printf("Job [%d] (%d) terminated by signal %d\n", ...);
+        deletejob(jobs, pid);              // 先打印，再删！
+    } else if (WIFSTOPPED(status)) {
+        jp->state = ST;                    // 改状态，不删
+        printf("Job [%d] (%d) stopped by signal %d\n", ...);
+    }
+}
+errno = olderr;  // ★ 恢复 errno</pre>
+
+  <h3>4.5 <code>do_bgfg(argv)</code></h3>
+  <pre>// 1. 参数检查：空 → 报错；%n → getjobjid；数字 → getjobpid；其他 → 报错
+// 2. kill(-jobp->pid, SIGCONT)  // ★ 向整组发 SIGCONT
+// 3. fg → jobp->state = FG → waitfg(jobp->pid)
+//    bg → jobp->state = BG → printf("[%d] (%d) %s", ...)</pre>
+
+  <h3>4.6 <code>sigint_handler(sig)</code></h3>
+  <pre>pid = fgpid(jobs);
+if (pid != 0) kill(-pid, SIGINT);  // 有前台任务才发，防止误杀 shell</pre>
+
+  <h3>4.7 <code>sigtstp_handler(sig)</code></h3>
+  <pre>pid = fgpid(jobs);
+if (pid != 0) kill(-pid, SIGTSTP); // 发给前台进程组，子进程暂停后内核触发 SIGCHLD</pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <h2>5. 作业状态机</h2>
+  <p>整个 shell 的作业管理围绕四个状态转换展开：</p>
+  <pre>
+              fork + exec
+ ┌─────────────────────────────┐
+ │                             ▼
+ │                          ┌──────┐
+ │         Ctrl-Z           │  FG  │ ← 前台（最多 1 个）
+ │       ┌───────────────── │      │
+ │       │                  └──────┘
+ │       ▼                     ▲
+ │   ┌──────┐   bg %n         │  fg %n
+ └───│  ST  │────────────────►├──────┐
+     │ 暂停 │                 │  BG  │ ← 后台（可多个）
+     └──────┘                 └──────┘
+         ▲                        │
+         └────── Ctrl-Z ──────────┘</pre>
+
+  <table>
+    <tr><th>状态</th><th>含义</th><th>如何进入</th></tr>
+    <tr><td><code>FG</code></td><td>前台运行</td><td>fork 非 & 命令；fg %n</td></tr>
+    <tr><td><code>BG</code></td><td>后台运行</td><td>fork & 命令；bg %n</td></tr>
+    <tr><td><code>ST</code></td><td>已停止</td><td>Ctrl-Z 暂停前台任务</td></tr>
+    <tr><td><code>UNDEF</code></td><td>空槽位</td><td>deletejob 后清除</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <h2>6. 测试结果</h2>
+  <p>运行 <code>./run_traces.sh</code>（自写的并行测试脚本，对 PID 做归一化处理），16 个 trace 全部通过：</p>
+
+  <div class="pass-list">
+    <span>✓ trace01 — EOF 正常退出</span>
+    <span>✓ trace02 — quit 内置命令</span>
+    <span>✓ trace03 — 前台任务执行</span>
+    <span>✓ trace04 — 后台任务执行</span>
+    <span>✓ trace05 — jobs 命令</span>
+    <span>✓ trace06 — SIGINT 转发前台</span>
+    <span>✓ trace07 — SIGINT 只杀前台</span>
+    <span>✓ trace08 — SIGTSTP 暂停前台</span>
+    <span>✓ trace09 — bg 后台恢复</span>
+    <span>✓ trace10 — fg 前台恢复</span>
+    <span>✓ trace11 — SIGINT 整组杀死</span>
+    <span>✓ trace12 — SIGTSTP 整组暂停</span>
+    <span>✓ trace13 — fg 恢复整组</span>
+    <span>✓ trace14 — 错误处理</span>
+    <span>✓ trace15 — 综合测试</span>
+    <span>✓ trace16 — 非终端信号处理</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <h2>7. 踩过的坑</h2>
+
+  <table>
+    <tr><th>问题</th><th>现象</th><th>根因 & 解决</th></tr>
+    <tr>
+      <td>Ctrl-C 杀死 shell</td>
+      <td>trace06 一跑 shell 直接退出</td>
+      <td>没调 <code>setpgid(0,0)</code>，子进程和 shell 同进程组。<br>在子进程 <code>execve</code> 前加 <code>setpgid(0,0)</code> 解决。</td>
+    </tr>
+    <tr>
+      <td>幽灵任务</td>
+      <td>jobs 列出一个早该消失的任务</td>
+      <td>fork 前没屏蔽 SIGCHLD，handler 在 addjob 前 deletejob。<br>fork 前 <code>SIG_BLOCK</code>，addjob 后 <code>SIG_SETMASK</code>。</td>
+    </tr>
+    <tr>
+      <td>jid 打印为 0</td>
+      <td>输出 <code>Job [0] (xxx) terminated</code></td>
+      <td>先 <code>deletejob</code> 再 <code>pid2jid</code>，此时 job 已删找不到。<br>调换顺序：先打印再删除。</td>
+    </tr>
+    <tr>
+      <td>僵尸残留</td>
+      <td>偶发 jobs 列表多出任务</td>
+      <td>handler 用 <code>if</code> 不用 <code>while</code>，漏回收合并信号中的其他子进程。<br>改 <code>if</code> 为 <code>while</code>。</td>
+    </tr>
+    <tr>
+      <td>trace14 通不过</td>
+      <td>错误信息 diff 一行</td>
+      <td>错误信息格式（冒号、空格、换行）与参考实现不完全一致。<br>对照 <code>tshref.out</code> 逐字符修正。</td>
+    </tr>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <h2>8. 实验心得</h2>
+  <p>
+    这个 lab 本质上是在训练<strong>「信号 + 进程组 + 临界区」</strong>三者的协同能力：
+  </p>
+  <p>
+    <strong>进程组</strong>让 Ctrl-C / Ctrl-Z 能精准命中前台任务而不波及 shell 自身；
+    <strong>信号机制</strong>让 shell 能异步感知子进程的退出和停止，无需轮询；
+    <strong>临界区保护</strong>（fork 前屏蔽 SIGCHLD）防止 job list 与子进程实际状态不一致。
+  </p>
+  <p>
+    这是我第一次从系统调用层面理解 Shell 的工作原理，对 <code>fork</code> / <code>execve</code> /
+    <code>waitpid</code> / <code>kill</code> / <code>sigprocmask</code> / <code>sigsuspend</code>
+    等关键系统调用有了直观的认知。理解最深刻的一点是：<strong>并发竞态不只出现在多线程中，
+    信号处理与主流程的交叉执行同样构成并发，需要临界区保护。</strong>
+  </p>
+</section>
+
+<footer>
+  CS:APP Shell Lab · 学号 202402720028 · 2026 年 6 月
+</footer>
+
+</body>
+</html>

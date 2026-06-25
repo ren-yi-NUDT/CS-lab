@@ -1,4 +1,4 @@
-# CS:APP Shell Lab 小白复现指南
+# Shell Lab Report
 
 > 目标：把 `shlab-handout/tsh.c` 这个只有空壳的"玩具 shell"补全，让它能像参考实现 `tshref` 一样，跑通全部 16 个 trace 测试。
 
@@ -179,7 +179,7 @@ int builtin_cmd(char **argv)
 
 ### 3.2 `do_bgfg` —— bg/fg 命令
 
-参数格式：`bg %2`（按 job id）、`bg 12345`（按 pid）、`bg`（缺参数，报错）、`bg abc`（参数格式不对，报错）。
+参数格式：`bg %2`（按 jid）、`bg 12345`（按 pid）
 
 ```c
 void do_bgfg(char **argv)
