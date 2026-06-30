@@ -18,3 +18,5 @@ Windows:
 
 
 【提交】你需要将mm.c修改为mm_201900221122.c，其中后面是你的学号。提交到educoder上。你只需要提交mm.c文件。
+
+claude --resume 4a211aa5-9ec3-4e4c-b803-8297997764c0

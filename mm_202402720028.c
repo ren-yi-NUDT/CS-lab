@@ -279,9 +279,7 @@ static size_t round_payload_pow2(size_t payload) {
     int bits = 64 - __builtin_clzll(payload - 1);
     size_t next_pow2 = (size_t)1 << bits;
     size_t prev_pow2 = next_pow2 >> 1;
-    /* 如果 payload 已经等于 prev_pow2，直接返回 */
     if (payload == prev_pow2) return payload;
-    /* 否则若接近 next_pow2，取整；否则保持 */
     if (payload * 100 >= next_pow2 * 87) {
         return next_pow2;
     }
@@ -519,4 +517,23 @@ void* mm_realloc(void* ptr, size_t size) {
 
 void mm_heapcheck(void) {
     /* 暂不实现，mdriver 当前不会调用 */
+}
+
+/* DEBUG: print free list stats */
+void mm_print_stats(void) {
+    int total_blocks = 0;
+    size_t total_free = 0;
+    for (int c = 0; c < NUM_CLASSES; c++) {
+        int n = 0; size_t tot = 0;
+        void* node = free_lists[c];
+        while (node) {
+            size_t sz = GET_SIZE(HDRP(node));
+            n++; tot += sz;
+            node = NEXT_FREE(node);
+        }
+        if (n) printf("[STATS] class %d: %d free blocks, %zu bytes\n", c, n, tot);
+        total_blocks += n;
+        total_free += tot;
+    }
+    printf("[STATS] total: %d free blocks, %zu bytes free\n", total_blocks, total_free);
 }
