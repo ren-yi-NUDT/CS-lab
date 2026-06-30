@@ -195,7 +195,7 @@ static void* coalesce(void* bp) {
     return bp;
 }
 
-/* 在 free 块中找适配（小块 first-fit，中大块 best-fit） */
+/* 在 free 块中找适配（全部 class 使用 best-fit 以提高利用率） */
 static void* find_fit(size_t asize) {
     int cls = find_class(asize);
 
@@ -203,28 +203,19 @@ static void* find_fit(size_t asize) {
         void* node = free_lists[c];
         if (node == NULL) continue;
 
-        if (c <= 5) {
-            /* 小块 first-fit */
-            while (node != NULL) {
-                if (GET_SIZE(HDRP(node)) >= asize) {
-                    return node;
-                }
-                node = NEXT_FREE(node);
+        /* 在当前 class 内 best-fit */
+        void* best = NULL;
+        size_t best_size = (size_t)-1;
+        while (node != NULL) {
+            size_t sz = GET_SIZE(HDRP(node));
+            if (sz >= asize && sz < best_size) {
+                best = node;
+                best_size = sz;
+                if (sz == asize) break;  /* 完美匹配，提前退出 */
             }
-        } else {
-            /* 中大块 best-fit */
-            void* best = NULL;
-            size_t best_size = (size_t)-1;
-            while (node != NULL) {
-                size_t sz = GET_SIZE(HDRP(node));
-                if (sz >= asize && sz < best_size) {
-                    best = node;
-                    best_size = sz;
-                }
-                node = NEXT_FREE(node);
-            }
-            if (best != NULL) return best;
+            node = NEXT_FREE(node);
         }
+        if (best != NULL) return best;
     }
     return NULL;
 }
@@ -279,12 +270,32 @@ int mm_init(void) {
     return 0;
 }
 
+/* 把 payload 向上舍入到最近的 2 的幂。使相似大小的请求得到相同 block size，
+ * 在 binary traces（A/B 交替 alloc/free 后再 alloc C）中显著提升利用率。
+ * 例如 112 -> 128 payload -> 136 block；128 -> 128 payload -> 136 block。两者匹配。
+ * 为减少 random traces 的浪费，仅当 size 接近 pow2（>= 0.85）才取整，否则保持原值。 */
+static size_t round_payload_pow2(size_t payload) {
+    if (payload <= 16) return 16;
+    int bits = 64 - __builtin_clzll(payload - 1);
+    size_t next_pow2 = (size_t)1 << bits;
+    size_t prev_pow2 = next_pow2 >> 1;
+    /* 如果 payload 已经等于 prev_pow2，直接返回 */
+    if (payload == prev_pow2) return payload;
+    /* 否则若接近 next_pow2，取整；否则保持 */
+    if (payload * 100 >= next_pow2 * 87) {
+        return next_pow2;
+    }
+    return payload;
+}
+
 void* mm_malloc(size_t size) {
     if (size == 0) return NULL;
 
-    /* asize = ALIGN(size + WSIZE)，最小 MIN_BLOCK（保证 free 后能放下 prev/next/footer） */
-    size_t asize = (size + WSIZE + 7) & ~0x7L;
+    /* payload 舍入到 pow2，再加 header，最小 MIN_BLOCK */
+    size_t payload = round_payload_pow2(size);
+    size_t asize = payload + WSIZE;
     if (asize < MIN_BLOCK) asize = MIN_BLOCK;
+    asize = (asize + 7) & ~0x7L;
 
     void* bp = find_fit(asize);
     if (bp != NULL) {
@@ -349,8 +360,10 @@ void* mm_realloc(void* ptr, size_t size) {
 
     size_t old_size = GET_SIZE(HDRP(ptr));
     size_t old_payload = old_size - WSIZE;  /* allocated 块只有 header */
-    size_t asize = (size + WSIZE + 7) & ~0x7L;
+    size_t payload = round_payload_pow2(size);
+    size_t asize = payload + WSIZE;
     if (asize < MIN_BLOCK) asize = MIN_BLOCK;
+    asize = (asize + 7) & ~0x7L;
 
     /* ----- Level 1: 缩小或不变 ----- */
     if (asize <= old_size) {
