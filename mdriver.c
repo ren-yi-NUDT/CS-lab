@@ -1261,7 +1261,7 @@ static void printresults(int n, stats_t* stats)
 	printf("[%s] +---------------------------------------------------------+\n", __func__);
 	for (i = 0; i < n; i++) {
 		if (stats[i].valid) {
-			printf("[%s] | %5d | %6s | %3.0f%% | %8.0f | %10.6f |  %6.0f |\n", __func__,
+			printf("[%s] | %5d | %6s | %6.2f%% | %8.0f | %10.6f |  %6.0f |\n", __func__,
 				i,
 				"yes",
 				stats[i].util * 100.0,
@@ -1279,7 +1279,7 @@ static void printresults(int n, stats_t* stats)
 
 	/* Print the aggregate results for the set of traces */
 	if (errors == 0) {
-		printf("[%s] | 累计  |        | %3.0f%% | %8.0f | %10.6f |  %6.0f |\n\n", __func__,
+		printf("[%s] | 累计  |        | %6.2f%% | %8.0f | %10.6f |  %6.0f |\n\n", __func__,
 			(util / n) * 100.0,
 			ops,
 			secs * 1000,
