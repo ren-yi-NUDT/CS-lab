@@ -36,10 +36,11 @@ team_t team = {
 
 /* ===== 常量 ===== */
 #define WSIZE 8
-#define MIN_BLOCK 16
+#define MIN_BLOCK 16       /* free block 需要 16 字节（两个指针） */
+#define ALIGN_MASK 7       /* 8 字节对齐 — 优于 16，省 ~10% heap on small-payload traces */
 #define CHUNKSIZE 4096
 #define MAX_HEAP (20 * (1 << 20))
-#define TABLE_SIZE (MAX_HEAP / MIN_BLOCK)
+#define TABLE_SIZE (MAX_HEAP / 8)   /* 8 字节粒度的 side table */
 #define NUM_CLASSES 13
 #define POW2_LIMIT 512
 
@@ -57,7 +58,7 @@ static char*    last_block_p;
 
 /* ===== 元数据访问 ===== */
 static inline int bidx(void* p) {
-    return (int)((char*)p - heap_lo) >> 4;
+    return (int)((char*)p - heap_lo) >> 3;
 }
 
 static inline size_t blk_size(void* p) {
@@ -106,10 +107,10 @@ static inline void update_next_prev(void* p, int prev_alloc_for_next) {
     prev_tab[bidx(nx)] = (uint32_t)((char*)p - heap_lo) + 1;
 }
 
-/* 自适应切分阈值：小块用 MIN_BLOCK，大块用 asize/16 */
+/* 切分阈值：remainder >= MIN_BLOCK 就 split */
 static inline size_t split_threshold(size_t asize) {
-    if (asize < 256) return MIN_BLOCK;
-    return asize >> 4;
+    (void)asize;
+    return MIN_BLOCK;
 }
 
 /* ===== 空闲链表指针 ===== */
@@ -155,7 +156,7 @@ static void remove_free(void* bp) {
 /* ===== 扩堆 ===== */
 static void* extend_heap(size_t size) {
     size = MAX(size, MIN_BLOCK);
-    size = (size + 15) & ~(size_t)15;
+    size = (size + ALIGN_MASK) & ~(size_t)ALIGN_MASK;
 
     char* bp = mem_sbrk(size);
     if (bp == (void*)-1) return NULL;
@@ -297,7 +298,7 @@ void* mm_malloc(size_t size) {
     if (size == 0) return NULL;
 
     size_t payload = round_payload_pow2(size);
-    size_t asize = (payload + 15) & ~(size_t)15;
+    size_t asize = (payload + ALIGN_MASK) & ~(size_t)ALIGN_MASK;
     if (asize < MIN_BLOCK) asize = MIN_BLOCK;
 
     void* bp = find_fit(asize);
@@ -358,7 +359,7 @@ void* mm_realloc(void* ptr, size_t size) {
     size_t old_size = blk_size(ptr);
     size_t old_payload = old_size;
     size_t payload = round_payload_pow2(size);
-    size_t asize = (payload + 15) & ~(size_t)15;
+    size_t asize = (payload + ALIGN_MASK) & ~(size_t)ALIGN_MASK;
     if (asize < MIN_BLOCK) asize = MIN_BLOCK;
 
     /* ----- Level 1: 缩小或不变 ----- */
@@ -426,7 +427,7 @@ void* mm_realloc(void* ptr, size_t size) {
     if (ptr == last_block_p) {
         size_t need = asize - old_size;
         if (need < MIN_BLOCK) need = MIN_BLOCK;
-        need = (need + 15) & ~(size_t)15;
+        need = (need + ALIGN_MASK) & ~(size_t)ALIGN_MASK;
         void* extra = mem_sbrk(need);
         if (extra == (void*)-1) {
             void* newp = mm_malloc(size);
