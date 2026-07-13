@@ -1,0 +1,14 @@
+# 编译产物
+webserver
+*.o
+*.a
+core
+
+# 运行时日志
+webserver.log
+
+# 编辑器
+*.swp
+*~
+.vscode/
+.idea/
