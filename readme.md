@@ -10,17 +10,20 @@
 - 访问日志 `webserver.log`（时间、IP、方法、路径）
 - 安全：拒绝 `..` 目录穿越
 
-## 编译
+## 一键启动
 
 ```bash
-make
+./run.sh                   # 编译 + 启动 + 打印访问信息，Ctrl-C 退出
+./run.sh my.ini            # 用指定配置
 ```
 
-## 运行
+## 手动编译 / 运行
 
 ```bash
+make                       # 仅编译
 ./webserver                # 读 ./webserver.ini
 ./webserver my.ini         # 读指定配置
+make clean                 # 清理产物与日志
 ```
 
 ## 测试
