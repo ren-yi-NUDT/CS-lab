@@ -1,0 +1,20 @@
+强大的分支预测器，是现代高性能处理器的关键技术。通过高准确度的分支预测，可以大大降低由于分支错误带来的性能损失。
+
+本实验采用一个给定的分支预测器框架，需要同学们实现自己的分支预测器算法，尽力降低**MISPRED_PER_1K_INST值**（每一千条指令，预测错误的指令数）。
+你只能修改predictor.c文件，其他文件请勿修改。（参考代码中，已经实现了一个经典的Gshare分支预测器，可供参考）
+
+请参考Readme.txt文件获取编译信息。
+**【建议有能力的同学】实现TAGE分支预测器。[TAGE分支预测器](https://blog.csdn.net/Alchemist2002/article/details/123959091)**
+
+![](/api/attachments/682599)
+
+【提交】请最后提交predictor.c文件、简要说明文件（采用的思路、分析、结论）、一个excel文件，描述课件要求的实验目标1~实验目标7的数据。
+![,](/api/attachments/9326547?type=image/png)
+
+参考资料：
+**处理器结构--分支预测(Branch Prediction)**
+https://www.jianshu.com/p/be389eeba589
+**分支预测器**
+https://zh.wikipedia.org/wiki/%E5%88%86%E6%94%AF%E9%A0%90%E6%B8%AC%E5%99%A8
+**深入理解 CPU 的分支预测(Branch Prediction)模型**
+https://blog.csdn.net/hanzefeng/article/details/82893317
