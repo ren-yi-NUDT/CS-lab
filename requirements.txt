@@ -1,0 +1,16 @@
+本实验的主要任务，是实现一个组相联的Data Cache，达到最高命中率。
+参考设计给出了一个直接映射的Data Cache实现，你可以首先尝试写一个全相联的Data Cache实现，然后开始实现一个组相联的Data Cache。
+你只能修改Cache.c文件。
+你的Data Cache最大只能使用16KB的数据存储空间。
+你可以尝试写一个Inst Cache，用于处理Trace中的指令访问。
+
+【高阶要求】有能力的同学，可以考虑在以上基础上，实现
+1、4KB的牺牲Cache（Victim Cache）
+2、1MB的L2统一Cache
+
+【提示】你可以首先运行较小的trace，例如dave.trace.zst等，来验证你的实现的正确性。
+
+【提交】提交Cache_20180500022.c，其中后面的数字为你的学号。
+你提交的文件，将会被复制到特定的机器上运行评分。
+
+【评分】你的Cache.c，将会运行gedit.trace.zst，并进行评分。
