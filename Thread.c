@@ -1,5 +1,5 @@
 /*
-	Thread_202402720028.c
+	Thread.c
 	多线程搜索密码程序（实验组）：pthread + 8-wide AVX2 + 内嵌汇编
 
 	核心思路：把 SearchRandom.c 单线程版改写为多线程版，并在热循环中
@@ -17,7 +17,7 @@
 	6) 区间回绕：end - i 用 uint32 无符号语义自动处理 0xFFFFFFFF 跨越
 
 	编译：-mavx2；保持 gcc 默认 -O0（不违反 pptx 优化级别限制）
-	用法：./Thread_202402720028 [线程数]    默认 8
+	用法：./Thread [线程数]    默认 8
 */
 
 #define _GNU_SOURCE

@@ -1,15 +1,15 @@
 CC = gcc
 CFLAGS = -Wall -pthread
 
-all: SearchRandom Thread_202402720028
+all: SearchRandom Thread
 
 SearchRandom: SearchRandom.c
 	$(CC) -o SearchRandom SearchRandom.c
 
-Thread_202402720028: Thread_202402720028.c
-	$(CC) $(CFLAGS) -mavx2 -o Thread_202402720028 Thread_202402720028.c
+Thread: Thread.c
+	$(CC) $(CFLAGS) -mavx2 -o Thread Thread.c
 
 clean:
-	rm -f SearchRandom Thread_202402720028
+	rm -f SearchRandom Thread
 
 .PHONY: all clean
