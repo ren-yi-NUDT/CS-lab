@@ -1,7 +1,5 @@
 /*
  * tsh - A tiny shell program with job control
- *
- * Student ID: 202402720028
  */
 #include <stdio.h>
 #include <stdlib.h>
