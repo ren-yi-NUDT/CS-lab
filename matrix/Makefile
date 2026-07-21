@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -O2 -Wall -Wno-incompatible-pointer-types -Wno-implicit-function-declaration -Wno-int-to-pointer-cast
 TARGET = rowcol_test.exe
 
-SRCS = rowcol_202402720028.c rowcol_test.c cpe.c fcyc.c clock.c lsquare.c
+SRCS = rowcol.c rowcol_test.c cpe.c fcyc.c clock.c lsquare.c
 OBJS = $(SRCS:.c=.o)
 
 all: $(TARGET)
