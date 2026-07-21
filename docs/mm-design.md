@@ -337,7 +337,7 @@ total       = score_util + score_speed
 
 | 文件 | 作用 | 能改吗 |
 |------|------|--------|
-| `mm_202402720028.c` | **本分配器实现** | ✅ 只能改这个 |
+| `mm.c` | **本分配器实现** | ✅ 只能改这个 |
 | `mm.c` | 软链到上述文件 | ✅(改链) |
 | `mdriver.c` | 测试驱动 | ❌ |
 | `memlib.c` | 模拟 sbrk | ❌ |
@@ -411,7 +411,7 @@ total       = score_util + score_speed
 
 如果想换学号文件名:
 ```bash
-cp mm_202402720028.c mm_<你的学号>.c
+cp mm.c mm_<你的学号>.c
 ln -sf mm_<你的学号>.c mm.c
 make
 ```
