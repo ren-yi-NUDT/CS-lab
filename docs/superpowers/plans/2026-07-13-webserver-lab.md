@@ -12,8 +12,8 @@
 
 ## Global Constraints
 
-- 文件名严格用 `webserver_202402720028.c`（要求提交格式）
-- 编译命令：`gcc -O2 -Wall -Werror -pthread -o webserver webserver_202402720028.c`（实际不需要 pthread，但 `-Wall -Werror` 必须）
+- 文件名严格用 `webserver.c`（要求提交格式）
+- 编译命令：`gcc -O2 -Wall -Werror -pthread -o webserver webserver.c`（实际不需要 pthread，但 `-Wall -Werror` 必须）
 - 默认端口 8080，默认 root `.`，配置文件 `./webserver.ini`
 - HTTP 响应统一用 HTTP/1.0 + `Connection: close`
 - 不引入任何外部库（CSAPP.h / csapp.c 不直接 link，所有需要的代码内联进 .c）
@@ -26,7 +26,7 @@
 
 | 文件 | 责任 |
 |------|------|
-| `webserver_202402720028.c` | 唯一的 C 源文件。从上到下：包含头、常量、RIO、open_listenfd、辅助函数、handle_request、sigchld_handler、main |
+| `webserver.c` | 唯一的 C 源文件。从上到下：包含头、常量、RIO、open_listenfd、辅助函数、handle_request、sigchld_handler、main |
 | `webserver.ini` | 配置示例（Linux 友好）：`root=/home/ren/Desktop/CS/lab`、`port=8080` |
 | `Makefile` | `make` / `make clean` / `make run` |
 | `readme.md` | 快速上手（编译、启动、测试、期望输出） |
@@ -40,7 +40,7 @@
 **目标：** 让服务器能监听端口，接受一个连接，读请求，回固定字符串，关闭。验证 socket 流程跑通。
 
 **Files:**
-- Create: `webserver_202402720028.c`
+- Create: `webserver.c`
 
 **Interfaces:**
 - Produces:
@@ -52,11 +52,11 @@
 
 - [ ] **Step 1: 创建文件骨架（头注释 + includes + 常量）**
 
-写入 `webserver_202402720028.c`：
+写入 `webserver.c`：
 
 ```c
 /*
- * webserver_202402720028.c —— 计算机系统实验10 Web 服务器
+ * webserver.c —— 计算机系统实验10 Web 服务器
  *
  * 三级功能：
  *   1. 基础：监听端口、服务静态页面、fork 并发处理多请求
@@ -64,7 +64,7 @@
  *   3. webserver.log 访问日志（时间、IP、方法、路径）
  *
  * 参考：CSAPP 第 11.5、11.6 节（Tiny Web 服务器）
- * 编译：gcc -O2 -Wall -Werror -o webserver webserver_202402720028.c
+ * 编译：gcc -O2 -Wall -Werror -o webserver webserver.c
  * 运行：./webserver [path/to/webserver.ini]
  */
 
@@ -271,7 +271,7 @@ int main(int argc, char **argv)
 - [ ] **Step 5: 编译验证**
 
 ```bash
-gcc -O2 -Wall -Werror -o webserver webserver_202402720028.c
+gcc -O2 -Wall -Werror -o webserver webserver.c
 ```
 
 Expected: 无 warning，无 error，生成 `webserver` 可执行文件。
@@ -291,7 +291,7 @@ Expected: 服务器打印 `[webserver] listening on port 8080 (single-shot mode)
 - [ ] **Step 7: Commit**
 
 ```bash
-git add webserver_202402720028.c
+git add webserver.c
 git commit -m "feat(webserver): 骨架 + CSAPP RIO + open_listenfd + 单次 accept"
 ```
 
@@ -302,7 +302,7 @@ git commit -m "feat(webserver): 骨架 + CSAPP RIO + open_listenfd + 单次 acce
 **目标：** 替换 main 中的占位逻辑，实现真正的 GET 解析、文件服务、404 错误页。这一步还不 fork —— 单次 accept 后退出，但能正确返回 index.html。
 
 **Files:**
-- Modify: `webserver_202402720028.c`
+- Modify: `webserver.c`
 
 **Interfaces:**
 - Consumes: RIO 包，open_listenfd
@@ -329,7 +329,7 @@ void client_error(int fd, const char *cause, int errnum,
     int bn = snprintf(body, sizeof(body),
         "<html><head><title>Web Server Error</title></head>"
         "<body><h1>%d %s</h1><p>%s: %s</p>"
-        "<hr><i>webserver_202402720028</i>"
+        "<hr><i>webserver</i>"
         "</body></html>",
         errnum, shortmsg, longmsg, cause);
 
@@ -442,7 +442,7 @@ void serve_static(int fd, const char *filename, int filesize)
     char header[MAXBUF];
     int  hn = snprintf(header, sizeof(header),
         "HTTP/1.0 200 OK\r\n"
-        "Server: webserver_202402720028\r\n"
+        "Server: webserver\r\n"
         "Content-Type: %s\r\n"
         "Content-Length: %d\r\n"
         "Connection: close\r\n\r\n",
@@ -555,7 +555,7 @@ int main(int argc, char **argv)
 - [ ] **Step 7: 编译**
 
 ```bash
-gcc -O2 -Wall -Werror -o webserver webserver_202402720028.c
+gcc -O2 -Wall -Werror -o webserver webserver.c
 ```
 
 Expected: 编译通过。
@@ -584,7 +584,7 @@ kill $SERVER_PID
 - [ ] **Step 9: Commit**
 
 ```bash
-git add webserver_202402720028.c
+git add webserver.c
 git commit -m "feat(webserver): handle_request + serve_static + client_error + MIME + 403/404"
 ```
 
@@ -595,7 +595,7 @@ git commit -m "feat(webserver): handle_request + serve_static + client_error + M
 **目标：** 让服务器能持续接受连接，每个连接 fork 一个子进程处理。父进程异步回收僵尸进程。SIGPIPE 忽略。
 
 **Files:**
-- Modify: `webserver_202402720028.c`
+- Modify: `webserver.c`
 
 **Interfaces:**
 - Consumes: handle_request, open_listenfd
@@ -713,7 +713,7 @@ int main(int argc, char **argv)
 - [ ] **Step 3: 编译**
 
 ```bash
-gcc -O2 -Wall -Werror -o webserver webserver_202402720028.c
+gcc -O2 -Wall -Werror -o webserver webserver.c
 ```
 
 - [ ] **Step 4: 测试多次请求（不重启服务器）**
@@ -743,7 +743,7 @@ Expected: 每次请求都返回 200 + 正确字节数。并发请求也能全部
 - [ ] **Step 5: Commit**
 
 ```bash
-git add webserver_202402720028.c
+git add webserver.c
 git commit -m "feat(webserver): fork 并发 + SIGCHLD 回收 + SIGPIPE 忽略"
 ```
 
@@ -754,7 +754,7 @@ git commit -m "feat(webserver): fork 并发 + SIGCHLD 回收 + SIGPIPE 忽略"
 **目标：** 从 `./webserver.ini`（或 `argv[1]`）读取 `root` 与 `port`，覆盖默认值。缺失则用默认。
 
 **Files:**
-- Modify: `webserver_202402720028.c`
+- Modify: `webserver.c`
 - Create: `webserver.ini`
 
 **Interfaces:**
@@ -962,7 +962,7 @@ main 中对应改为 `handle_request(connfd, root, &clientaddr);`。
 - [ ] **Step 5: 编译并测试**
 
 ```bash
-gcc -O2 -Wall -Werror -o webserver webserver_202402720028.c
+gcc -O2 -Wall -Werror -o webserver webserver.c
 ./webserver &
 SERVER_PID=$!
 sleep 0.5
@@ -983,7 +983,7 @@ Expected: 启动时打印 `config loaded from webserver.ini` + `root=/home/ren/D
 - [ ] **Step 6: Commit**
 
 ```bash
-git add webserver_202402720028.c webserver.ini
+git add webserver.c webserver.ini
 git commit -m "feat(webserver): webserver.ini 配置解析 + handle_request 接收 clientaddr"
 ```
 
@@ -994,7 +994,7 @@ git commit -m "feat(webserver): webserver.ini 配置解析 + handle_request 接�
 **目标：** 每次 handle_request 服务完成后，往 `./webserver.log` 追加一行。格式：`YYYY/MM/DD HH:MM:SS IP:x.x.x.x METHOD /path`。
 
 **Files:**
-- Modify: `webserver_202402720028.c`
+- Modify: `webserver.c`
 
 **Interfaces:**
 - Produces:
@@ -1048,7 +1048,7 @@ void log_request(const char *logpath,
 - [ ] **Step 3: 编译**
 
 ```bash
-gcc -O2 -Wall -Werror -o webserver webserver_202402720028.c
+gcc -O2 -Wall -Werror -o webserver webserver.c
 ```
 
 - [ ] **Step 4: 测试日志写入**
@@ -1077,7 +1077,7 @@ Expected: `webserver.log` 有 4 行记录（包括 403/404 也记录），每行
 - [ ] **Step 5: Commit**
 
 ```bash
-git add webserver_202402720028.c
+git add webserver.c
 git commit -m "feat(webserver): 访问日志 webserver.log"
 ```
 
@@ -1099,7 +1099,7 @@ git commit -m "feat(webserver): 访问日志 webserver.log"
 CC      = gcc
 CFLAGS  = -O2 -Wall -Werror -std=c99
 TARGET  = webserver
-SRC     = webserver_202402720028.c
+SRC     = webserver.c
 
 .PHONY: all clean run
 
@@ -1141,7 +1141,7 @@ make
 ls -l webserver
 ```
 
-Expected: 看到 `webserver` 可执行文件生成，编译命令为 `gcc -O2 -Wall -Werror -std=c99 -o webserver webserver_202402720028.c`。
+Expected: 看到 `webserver` 可执行文件生成，编译命令为 `gcc -O2 -Wall -Werror -std=c99 -o webserver webserver.c`。
 
 - [ ] **Step 4: Commit**
 
@@ -1211,7 +1211,7 @@ port=8080
 
 ## 文件清单
 
-- `webserver_202402720028.c` —— 服务器主程序
+- `webserver.c` —— 服务器主程序
 - `webserver.ini` —— 配置文件
 - `Makefile` —— 编译脚本
 - `index.html` —— 测试首页
@@ -1227,7 +1227,7 @@ port=8080
 ````markdown
 # Web 服务器实验 · 技术说明
 
-> `webserver_202402720028.c` 的设计与实现细节。CSAPP §11.5/11.6 风格。
+> `webserver.c` 的设计与实现细节。CSAPP §11.5/11.6 风格。
 
 ## 1. 问题
 
@@ -1424,7 +1424,7 @@ wait 2>/dev/null
 - [ ] **Step 4: 验收清单**
 
 逐项打勾：
-- [ ] `webserver_202402720028.c` 存在
+- [ ] `webserver.c` 存在
 - [ ] `make` 编译通过，无 warning
 - [ ] 启动后能多次访问（不重启）
 - [ ] 浏览器能看到 index.html 内容

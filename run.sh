@@ -10,7 +10,7 @@ cd "$(dirname "$0")"
 CFG="${1:-webserver.ini}"
 
 # 1. 编译（已存在且源码未变则跳过）
-if [ ! -x webserver ] || [ webserver_202402720028.c -nt webserver ]; then
+if [ ! -x webserver ] || [ webserver.c -nt webserver ]; then
     echo "[run] 编译中..."
     make
 fi

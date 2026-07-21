@@ -1,7 +1,5 @@
 # Web 服务器实验报告
 
-**学号**: 202402720028
-**姓名**: 任奕
 **实验日期**: 2026-07-13 ～ 2026-07-21
 **实验内容**: 计算机系统实验 10 —— 用纯 C 实现一个简单的 HTTP Web 服务器
 **参考教材**: CSAPP 第 11.5、11.6 节（Tiny Web 服务器）
@@ -18,7 +16,7 @@
 | 配置 | 支持 `webserver.ini` 配置文件，至少包含 `root`（网站根目录）和 `port`（监听端口） |
 | 日志 | 加入访问日志，记录客户端 IP、请求方法、路径、时间戳 |
 
-提交物：`webserver_202402720028.c` 一个文件。
+提交物：`webserver.c` 一个文件。
 
 ---
 
@@ -525,7 +523,7 @@ signal(SIGPIPE, SIG_IGN);                            /* 忽略 SIGPIPE：客户�
 | 缓冲区溢出 | ❌ | 低 | 所有读写都用 `MAXLINE` 边界检查，`sscanf` 用 `%63s` 限长 |
 | 日志注入 | ❌ | 低 | `sscanf %s` 天然过滤换行符 |
 | 信息泄露（路径回显） | ✅ | 中 | 404 错误页含服务器内部绝对路径，便于攻击者了解布局 |
-| Header 指纹 | ✅ | 低 | `Server: webserver_202402720028` 暴露身份 |
+| Header 指纹 | ✅ | 低 | `Server: webserver` 暴露身份 |
 | DoS（fork 失控） | ✅ | 高 | 无并发上限、无超时，易被慢连接攻击 |
 
 **主要风险是 DoS**。这是所有 fork-per-connection 模型的通病。生产环境的解决方法是 epoll + 线程池（nginx 做法），不在本实验范围。
@@ -536,7 +534,7 @@ signal(SIGPIPE, SIG_IGN);                            /* 忽略 SIGPIPE：客户�
 
 ```
 lab/
-├── webserver_202402720028.c   # 提交文件（487 行）
+├── webserver.c   # 提交文件（487 行）
 ├── webserver.ini              # 默认配置
 ├── www.ini                    # 测试配置（端口 11451）
 ├── Makefile                   # 编译脚本
@@ -597,7 +595,7 @@ lab/
 ```bash
 # 编译
 make                                    # 或 gcc -O2 -Wall -Werror -std=c99 \
-                                         #     -o webserver webserver_202402720028.c
+                                         #     -o webserver webserver.c
 
 # 启动（默认读 ./webserver.ini）
 ./webserver
@@ -643,7 +641,7 @@ $ curl -v http://localhost:11451/
 > Accept: */*
 >
 < HTTP/1.0 200 OK
-< Server: webserver_202402720028
+< Server: webserver
 < Content-Type: text/html
 < Content-Length: 77704
 < Connection: close

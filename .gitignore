@@ -1,14 +1,9 @@
-# 编译产物
-webserver
+# Object files
 *.o
+
+# Static libraries
 *.a
-core
 
-# 运行时日志
-webserver.log
-
-# 编辑器
-*.swp
-*~
+# IDE
 .vscode/
 .idea/

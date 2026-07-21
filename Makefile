@@ -3,7 +3,7 @@
 CC      = gcc
 CFLAGS  = -O2 -Wall -Werror -std=c99
 TARGET  = webserver
-SRC     = webserver_202402720028.c
+SRC     = webserver.c
 
 .PHONY: all clean run
 

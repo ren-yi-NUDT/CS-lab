@@ -1,5 +1,5 @@
 /*
- * webserver_202402720028.c —— 计算机系统实验10 Web 服务器
+ * webserver.c —— 计算机系统实验10 Web 服务器
  *
  * 三级功能：
  *   1. 基础：监听端口、服务静态页面、fork 并发处理多请求
@@ -7,7 +7,7 @@
  *   3. webserver.log 访问日志（时间、IP、方法、路径）
  *
  * 参考：CSAPP 第 11.5、11.6 节（Tiny Web 服务器）
- * 编译：gcc -O2 -Wall -Werror -std=c99 -o webserver webserver_202402720028.c
+ * 编译：gcc -O2 -Wall -Werror -std=c99 -o webserver webserver.c
  * 运行：./webserver [path/to/webserver.ini]
  */
 
@@ -165,7 +165,7 @@ static void client_error(int fd, const char *cause, int errnum,
     int bn = snprintf(body, sizeof(body),
         "<html><head><title>Web Server Error</title></head>"
         "<body><h1>%d %s</h1><p>%s: %s</p>"
-        "<hr><i>webserver_202402720028</i>"
+        "<hr><i>webserver</i>"
         "</body></html>",
         errnum, shortmsg, longmsg, cause);
 
@@ -257,7 +257,7 @@ static void serve_static(int fd, const char *filename, int filesize)
     char header[MAXBUF];
     int  hn = snprintf(header, sizeof(header),
         "HTTP/1.0 200 OK\r\n"
-        "Server: webserver_202402720028\r\n"
+        "Server: webserver\r\n"
         "Content-Type: %s\r\n"
         "Content-Length: %d\r\n"
         "Connection: close\r\n\r\n",

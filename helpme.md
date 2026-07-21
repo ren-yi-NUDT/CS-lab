@@ -8,7 +8,7 @@
 
 ## 第 0 章 · 你能从这份文档得到什么
 
-`webserver_202402720028.c` 是一个用 487 行 C 写出来的、能真正给浏览器提供网页的小服务器。但它读起来不直观：里面塞了 HTTP 协议、socket 编程、fork 并发、信号处理、文件 I/O、配置解析一堆东西，而且风格是 CSAPP 教材那种「为了教学清晰所以刻意简化」的写法。
+`webserver.c` 是一个用 487 行 C 写出来的、能真正给浏览器提供网页的小服务器。但它读起来不直观：里面塞了 HTTP 协议、socket 编程、fork 并发、信号处理、文件 I/O、配置解析一堆东西，而且风格是 CSAPP 教材那种「为了教学清晰所以刻意简化」的写法。
 
 这份文档的目标只有一个：**让一个完全没接触过网络编程的人，看完后能逐行讲清楚这个文件每一段在干什么、为什么这么写**。
 
@@ -117,7 +117,7 @@ GET       /         HTTP/1.1
 
 ```
 HTTP/1.0 200 OK                  ← 状态行
-Server: webserver_202402720028   ← 头部
+Server: webserver   ← 头部
 Content-Type: text/html
 Content-Length: 272
 Connection: close
@@ -156,7 +156,7 @@ HTTP/1.0   200     OK
 4. **写响应**：先写状态行 + 头部 + 空行，再写文件内容。
 5. **关连接**：完成。
 
-整个 `webserver_202402720028.c` 487 行代码，本质上就是在做这 5 件事，加一些「让多个客户端能同时连」、「读配置文件」、「写日志」的辅助功能。
+整个 `webserver.c` 487 行代码，本质上就是在做这 5 件事，加一些「让多个客户端能同时连」、「读配置文件」、「写日志」的辅助功能。
 
 ---
 
@@ -229,7 +229,7 @@ while (1) {
 
 ### 4.1 main 函数在干什么
 
-打开 `webserver_202402720028.c`，跳到最后看 `main` 函数（第 428 行）。剥掉细节，骨架是这样：
+打开 `webserver.c`，跳到最后看 `main` 函数（第 428 行）。剥掉细节，骨架是这样：
 
 ```c
 int main(int argc, char **argv)
@@ -340,7 +340,7 @@ static void sigchld_handler(int sig)
 
 ### 5.1 `open_listenfd`（监听端口）
 
-**位置**：`webserver_202402720028.c:119`
+**位置**：`webserver.c:119`
 
 **干嘛的**：把第 3.2 节的 socket+bind+listen 三步打包成一个函数，返回一个监听 fd。
 
@@ -389,7 +389,7 @@ static int open_listenfd(int port)
 
 ### 5.2 RIO 包（安全的读写）
 
-**位置**：`webserver_202402720028.c:45-113`
+**位置**：`webserver.c:45-113`
 
 **干嘛的**：CSAPP 教材自己实现的一套「Robust I/O」函数，封装了 `read`/`write`，处理了两个坑：
 
@@ -470,7 +470,7 @@ static ssize_t rio_readlineb(rio_t *rp, void *usrbuf, size_t maxlen)
 
 ### 5.3 `parse_uri`（URL 转文件路径）
 
-**位置**：`webserver_202402720028.c:207`
+**位置**：`webserver.c:207`
 
 **干嘛的**：浏览器发来的 URI 是 `/`、`/index.html`、`/foo/bar.css` 这种路径。服务器要把它转成机器上的真实文件路径，方法就是**前面拼上 root 目录**。
 
@@ -509,7 +509,7 @@ static int parse_uri(const char *uri, const char *root,
 
 ### 5.4 `get_mime_type`（文件类型 → Content-Type）
 
-**位置**：`webserver_202402720028.c:187`
+**位置**：`webserver.c:187`
 
 **干嘛的**：浏览器收到响应后，靠 `Content-Type` 头判断这是什么类型的文件，决定怎么渲染（HTML 直接显示、图片显示图、CSS 应用样式……）。这个函数根据文件扩展名返回正确的 MIME 类型。
 
@@ -534,7 +534,7 @@ static const char *get_mime_type(const char *filename)
 
 ### 5.5 `serve_static`（发送静态文件）
 
-**位置**：`webserver_202402720028.c:232`
+**位置**：`webserver.c:232`
 
 **干嘛的**：把一个文件读出来，加上 HTTP 头，发给客户端。
 
@@ -554,7 +554,7 @@ static void serve_static(int fd, const char *filename, int filesize)
     char header[MAXBUF];
     int  hn = snprintf(header, sizeof(header),         // 拼头部
         "HTTP/1.0 200 OK\r\n"
-        "Server: webserver_202402720028\r\n"
+        "Server: webserver\r\n"
         "Content-Type: %s\r\n"
         "Content-Length: %d\r\n"
         "Connection: close\r\n\r\n",
@@ -572,7 +572,7 @@ static void serve_static(int fd, const char *filename, int filesize)
 
 ### 5.6 `client_error`（返回错误页）
 
-**位置**：`webserver_202402720028.c:160`
+**位置**：`webserver.c:160`
 
 **干嘛的**：出错时返回一个简单的 HTML 错误页。格式跟 `serve_static` 一样，只是 body 是错误页 HTML。
 
@@ -585,7 +585,7 @@ static void client_error(int fd, const char *cause, int errnum,
     int bn = snprintf(body, sizeof(body),
         "<html><head><title>Web Server Error</title></head>"
         "<body><h1>%d %s</h1><p>%s: %s</p>"
-        "<hr><i>webserver_202402720028</i>"
+        "<hr><i>webserver</i>"
         "</body></html>",
         errnum, shortmsg, longmsg, cause);
 
@@ -605,7 +605,7 @@ static void client_error(int fd, const char *cause, int errnum,
 
 ### 5.7 `handle_request`（主处理流程）
 
-**位置**：`webserver_202402720028.c:301`
+**位置**：`webserver.c:301`
 
 **干嘛的**：处理一个连接的完整流程。读请求 → 解析 → 服务 → 记日志。
 
@@ -656,7 +656,7 @@ static void handle_request(int fd, const char *root,
 
 ### 5.8 `log_request`（写日志）
 
-**位置**：`webserver_202402720028.c:275`
+**位置**：`webserver.c:275`
 
 **干嘛的**：往 `webserver.log` 文件追加一行记录。
 
@@ -697,7 +697,7 @@ static void log_request(const char *logpath,
 
 ### 5.9 `parse_config`（读配置文件）
 
-**位置**：`webserver_202402720028.c:393`
+**位置**：`webserver.c:393`
 
 **干嘛的**：解析 `webserver.ini` 这种 `key=value` 格式的配置文件，提取 `root` 和 `port`。
 
@@ -762,7 +762,7 @@ static void trim(char *s)
 
 ### 5.10 `sigchld_handler`（回收子进程）
 
-**位置**：`webserver_202402720028.c:364`
+**位置**：`webserver.c:364`
 
 第 4.4 节已经讲过。完整代码：
 

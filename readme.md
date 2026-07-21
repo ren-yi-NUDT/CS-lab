@@ -53,7 +53,7 @@ port=8080
 
 | 文件 | 说明 |
 |------|------|
-| `webserver_202402720028.c` | 服务器主程序（提交文件） |
+| `webserver.c` | 服务器主程序（提交文件） |
 | `webserver.ini` | 配置文件 |
 | `Makefile` | 编译脚本 |
 | `index.html` | 测试首页 |

@@ -2,7 +2,7 @@
 date: 2026-07-13
 lab: 计算机系统实验10（Web 服务器）
 branch: lab11
-submission: webserver_202402720028.c
+submission: webserver.c
 ---
 
 # 设计规格：Web 服务器实验
@@ -69,7 +69,7 @@ main
 ## 4. 文件与函数布局
 
 ```
-webserver_202402720028.c
+webserver.c
 ├── CSAPP 辅助（内联）
 │   ├── rio_readinitb / rio_readlineb / rio_writen / rio_readnb
 │   ├── open_listenfd   // socket/bind/listen 封装
@@ -110,7 +110,7 @@ webserver_202402720028.c
 
 ## 7. 交付清单
 
-- `webserver_202402720028.c` — 主提交文件（必需）
+- `webserver.c` — 主提交文件（必需）
 - `webserver.ini` — Linux 友好配置示例：`root=/home/ren/Desktop/CS/lab`、`port=8080`
 - `Makefile` — `make` 编译出 `webserver`；`make clean` 清理
 - 保留原文件：`index.html`、`www.ini`、`requirements.txt`、`计算机系统-实验10.pptx`
