@@ -29,7 +29,7 @@
 
 ## 🚀 快速开始
 
-### 方法一：克隆到本地
+### 方法一：克隆整个仓库
 
 ```bash
 git clone https://github.com/ren-yi-NUDT/CS-lab.git
@@ -39,7 +39,27 @@ cd CS-lab
 git checkout lab10    # 例：查看 malloc 实验室
 ```
 
-### 方法二：在 GitHub 网页直接浏览
+### 方法二：只克隆单个实验分支
+
+仓库有 12 个分支，如果只想下载某一个实验，用 `--single-branch`：
+
+```bash
+# 只拉 lab10 分支（含历史），其他分支不下载
+git clone -b lab10 --single-branch https://github.com/ren-yi-NUDT/CS-lab.git
+cd CS-lab
+
+# 想进一步省空间：浅克隆，只取最新一次提交
+git clone -b lab10 --single-branch --depth 1 https://github.com/ren-yi-NUDT/CS-lab.git
+```
+
+后续如果又想看别的实验，在仓库目录里追加：
+
+```bash
+git fetch origin lab7                 # 把 lab7 拉下来
+git checkout lab7                     # 切过去
+```
+
+### 方法三：在 GitHub 网页直接浏览
 
 点击上方「在线 README」列的链接即可，无需克隆。
 
