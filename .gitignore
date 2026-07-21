@@ -1,0 +1,9 @@
+# Object files
+*.o
+
+# Static libraries
+*.a
+
+# IDE
+.vscode/
+.idea/
